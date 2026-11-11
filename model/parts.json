@@ -1,0 +1,482 @@
+{
+ "hair_back": {
+  "w": 1269,
+  "h": 1496,
+  "pad": 6,
+  "src": "01_hair_back",
+  "origin": [
+   42,
+   3
+  ]
+ },
+ "hair_side_r": {
+  "w": 308,
+  "h": 1306,
+  "pad": 6,
+  "src": "02_hair_side",
+  "origin": [
+   130,
+   119
+  ]
+ },
+ "hair_side_l": {
+  "w": 267,
+  "h": 1300,
+  "pad": 6,
+  "src": "02_hair_side",
+  "origin": [
+   638,
+   106
+  ]
+ },
+ "hair_front": {
+  "w": 799,
+  "h": 682,
+  "pad": 6,
+  "src": "03_hair_front",
+  "origin": [
+   120,
+   61
+  ]
+ },
+ "face": {
+  "w": 674,
+  "h": 776,
+  "pad": 6,
+  "src": "04_head",
+  "origin": [
+   181,
+   272
+  ]
+ },
+ "neck": {
+  "w": 624,
+  "h": 644,
+  "pad": 6,
+  "src": "04_head",
+  "origin": [
+   218,
+   777
+  ]
+ },
+ "nose": {
+  "w": 40,
+  "h": 44,
+  "pad": 6
+ },
+ "blush": {
+  "w": 200,
+  "h": 110,
+  "pad": 6
+ },
+ "eye_l_white": {
+  "w": 168,
+  "h": 101,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   27,
+   443
+  ]
+ },
+ "eye_l_iris": {
+  "w": 132,
+  "h": 102,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   207,
+   442
+  ]
+ },
+ "eye_l_hl": {
+  "w": 58,
+  "h": 87,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   362,
+   450
+  ]
+ },
+ "eye_l_lash": {
+  "w": 193,
+  "h": 86,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   445,
+   437
+  ]
+ },
+ "eye_l_crease": {
+  "w": 61,
+  "h": 30,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   478,
+   415
+  ]
+ },
+ "eye_l_lower": {
+  "w": 125,
+  "h": 32,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   642,
+   500
+  ]
+ },
+ "eye_l_closed": {
+  "w": 168,
+  "h": 44,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   837,
+   478
+  ]
+ },
+ "brow_l": {
+  "w": 140,
+  "h": 36,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   871,
+   409
+  ]
+ },
+ "eye_r_white": {
+  "w": 169,
+  "h": 101,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   26,
+   995
+  ]
+ },
+ "eye_r_iris": {
+  "w": 127,
+  "h": 103,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   216,
+   1013
+  ]
+ },
+ "eye_r_hl": {
+  "w": 59,
+  "h": 88,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   361,
+   1022
+  ]
+ },
+ "eye_r_lash": {
+  "w": 194,
+  "h": 83,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   432,
+   1008
+  ]
+ },
+ "eye_r_crease": {
+  "w": 61,
+  "h": 30,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   528,
+   983
+  ]
+ },
+ "eye_r_lower": {
+  "w": 126,
+  "h": 29,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   659,
+   1073
+  ]
+ },
+ "eye_r_closed": {
+  "w": 164,
+  "h": 44,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   839,
+   1050
+  ]
+ },
+ "brow_r": {
+  "w": 151,
+  "h": 37,
+  "pad": 6,
+  "src": "05_eyes",
+  "origin": [
+   854,
+   984
+  ]
+ },
+ "mouth_sad": {
+  "w": 204,
+  "h": 43,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   71,
+   270
+  ]
+ },
+ "mouth_grin": {
+  "w": 172,
+  "h": 38,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   380,
+   311
+  ]
+ },
+ "mouth_cavity": {
+  "w": 202,
+  "h": 121,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   670,
+   262
+  ]
+ },
+ "mouth_teeth": {
+  "w": 130,
+  "h": 49,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   1010,
+   284
+  ]
+ },
+ "mouth_tongue": {
+  "w": 137,
+  "h": 99,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   1303,
+   278
+  ]
+ },
+ "mouth_closed": {
+  "w": 128,
+  "h": 23,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   57,
+   722
+  ]
+ },
+ "mouth_open_s": {
+  "w": 123,
+  "h": 44,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   248,
+   712
+  ]
+ },
+ "mouth_open_l": {
+  "w": 145,
+  "h": 105,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   430,
+   688
+  ]
+ },
+ "mouth_open_m": {
+  "w": 121,
+  "h": 84,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   630,
+   700
+  ]
+ },
+ "mouth_tongue_out": {
+  "w": 100,
+  "h": 76,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   818,
+   708
+  ]
+ },
+ "mouth_smile_open": {
+  "w": 129,
+  "h": 67,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   985,
+   705
+  ]
+ },
+ "mouth_o": {
+  "w": 88,
+  "h": 67,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   1190,
+   705
+  ]
+ },
+ "mouth_smile": {
+  "w": 151,
+  "h": 36,
+  "pad": 6,
+  "src": "06_mouth",
+  "origin": [
+   1344,
+   718
+  ]
+ },
+ "body": {
+  "w": 803,
+  "h": 1355,
+  "pad": 6,
+  "src": "10_body",
+  "origin": [
+   120,
+   193
+  ]
+ },
+ "dress": {
+  "w": 1036,
+  "h": 1389,
+  "pad": 6,
+  "src": "07_dress",
+  "origin": [
+   0,
+   159
+  ]
+ },
+ "skirt": {
+  "w": 1015,
+  "h": 1071,
+  "pad": 6,
+  "src": "08_skirt",
+  "origin": [
+   14,
+   446
+  ]
+ },
+ "arm_r": {
+  "w": 285,
+  "h": 1018,
+  "pad": 6,
+  "src": "09_arms",
+  "origin": [
+   85,
+   369
+  ]
+ },
+ "arm_l": {
+  "w": 288,
+  "h": 1018,
+  "pad": 6,
+  "src": "09_arms",
+  "origin": [
+   671,
+   369
+  ]
+ },
+ "acc_hair_flower": {
+  "w": 284,
+  "h": 654,
+  "pad": 6,
+  "src": "11_accessories",
+  "origin": [
+   637,
+   12
+  ]
+ },
+ "acc_earring": {
+  "w": 54,
+  "h": 179,
+  "pad": 6,
+  "src": "11_accessories",
+  "origin": [
+   564,
+   274
+  ]
+ },
+ "acc_chest_bow": {
+  "w": 370,
+  "h": 414,
+  "pad": 6,
+  "src": "11_accessories",
+  "origin": [
+   206,
+   430
+  ]
+ },
+ "acc_sash": {
+  "w": 221,
+  "h": 814,
+  "pad": 6,
+  "src": "11_accessories",
+  "origin": [
+   620,
+   697
+  ]
+ },
+ "acc_chain": {
+  "w": 369,
+  "h": 402,
+  "pad": 6,
+  "src": "11_accessories",
+  "origin": [
+   272,
+   897
+  ]
+ },
+ "acc_bow_r": {
+  "w": 216,
+  "h": 267,
+  "pad": 6,
+  "src": "11_accessories",
+  "origin": [
+   8,
+   939
+  ]
+ },
+ "acc_bow_l": {
+  "w": 198,
+  "h": 274,
+  "pad": 6,
+  "src": "11_accessories",
+  "origin": [
+   838,
+   943
+  ]
+ }
+}

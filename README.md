@@ -1,1 +1,69 @@
-# claude-
+# 橙花少女 Live2D 风格模型
+
+用提供的分层素材（立绘、头发、脸、五官、服装、饰品）组装并绑定的可动模型。
+**直接双击 `index.html` 即可展示**，不需要服务器、不依赖任何第三方库，所有贴图都已内嵌在这一个文件里。
+
+> 说明：真正的 Live2D Cubism 模型（`.moc3`）只能由官方 Cubism Editor 导出，无法用脚本生成。
+> 这里是一套自己实现的 WebGL 网格变形运行时，效果和参数命名都向 Cubism 看齐，但不是 `.moc3` 文件，不能直接载入 VTube Studio 等软件。
+
+## 能做什么
+
+| 功能 | 说明 |
+| --- | --- |
+| 头部转动 | 左右 / 上下 / 倾斜，带伪 3D 视差（五官、刘海、后发各有深度） |
+| 眼睛 | 自动眨眼、眼珠跟随、笑眼；眼白作为遮罩裁切瞳孔；被刘海挡住的部分会淡淡透出来 |
+| 嘴 | 10 张口型贴图按「张开 × 形状」切换并缩放，可做口型同步演示 |
+| 身体 | 脊柱弯曲、左右前后倾、呼吸 |
+| 物理 | 刘海、侧发、后发、发带、耳坠、领结、流苏、腰带垂布、裙摆、手臂共 13 组弹簧摆 |
+| 互动 | 视线跟随指针；点头部会惊讶再微笑，点身体会晃一下 |
+| 表情 | 平静、微笑、开心、惊讶、难过、生气、俏皮、害羞 |
+| 展示 | 全身 / 半身 / 特写取景；影棚 / 纯色 / 绿幕 / 透明格背景（绿幕可用于 OBS 抠像） |
+
+## 参数
+
+沿用 Cubism 的标准命名，方便以后迁移：
+
+`ParamAngleX/Y/Z`、`ParamEyeLOpen`、`ParamEyeROpen`、`ParamEyeSmile`、`ParamEyeBallX/Y`、
+`ParamBrowY`、`ParamBrowAngle`、`ParamMouthOpenY`、`ParamMouthForm`、`ParamCheek`、
+`ParamBodyAngleX/Y/Z`、`ParamBreath`
+
+页面右侧可以拖动滑块手动接管任一参数，点「恢复自动」交还给动画。
+
+## 目录
+
+```
+index.html              成品（单文件，可直接打开）
+src/engine.js           WebGL 渲染器：网格绘制、遮罩
+src/model.js            绑定：各部件的变形与物理
+src/animator.js         待机、跟随、眨眼、表情、说话
+src/app.js              页面逻辑
+src/template.html       页面结构与样式
+model/layout.json       每个部件在画布上的位置、缩放、层级
+model/parts.json        贴图尺寸
+model/textures/*.png    抠好的部件贴图（透明底）
+assets/source/*.png     原始素材
+tools/                  素材处理与打包脚本
+```
+
+## 重新生成
+
+改了素材或布局之后：
+
+```bash
+pip install pillow numpy scipy opencv-python-headless
+python3 tools/build_parts.py     # 绿幕抠像 → 切成部件贴图
+python3 tools/make_layout.py     # 生成 model/layout.json
+python3 tools/preview.py out.png --ref   # 可选：静态拼装图，与立绘并排对比
+python3 tools/build_site.py      # 打包成 index.html
+```
+
+只改了 `src/` 里的代码时，执行最后一步即可。
+
+## 对素材做过的调整
+
+- **后发加长**：提供的后发比立绘短，肩部以下做了渐进拉伸并略微外扩。
+- **脸与脖子拆开**：沿下颌线分成两层，脖子向上补了一段阴影，转头时不会露缝。
+- **右眼镜像**：第二排眼睛的眼白、闭眼线、眉毛与第一排同向，已水平翻转。
+- **补画鼻子和腮红**：素材里没有，按立绘补了一笔鼻影和柔边腮红。
+- **头部默认微倾**：待机时保留立绘里歪头的感觉（`ParamAngleZ ≈ -9`）。
+- **未使用的部件**：素体（被礼裙完全遮住）和单独的袖口蝴蝶结（袖子贴图里已自带）已切好放在 `model/textures/`，但没有进入模型。

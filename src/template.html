@@ -1,0 +1,256 @@
+<title>橙花少女 Live2D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@600;700&family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a framed stage holding the model, with a dressing-table column of controls beside it (stacked below on phones). */
+:root {
+  --bg: #e9eeee;
+  --stage-a: #f7f9f9;
+  --stage-b: #cfdadb;
+  --panel: #fbfcfc;
+  --raise: #f1f4f4;
+  --line: #d3dcdd;
+  --fg: #2b2326;
+  --muted: #687174;
+  --accent: #d9562d;
+  --accent-soft: #fbe2d8;
+  --on-accent: #ffffff;
+  --gold: #a9763a;
+  --chroma: #00ff00;
+  --grid-a: #ffffff;
+  --grid-b: #dfe5e6;
+  --font-display: "Noto Serif SC", "Songti SC", "SimSun", serif;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15191b; --stage-a: #2b3336; --stage-b: #171c1e; --panel: #1c2224; --raise: #252c2f; --line: #343d40;
+    --fg: #f0ebe8; --muted: #9ba5a7; --accent: #ff8a5e; --accent-soft: #4b2b20; --on-accent: #241008; --gold: #d9a066;
+    --grid-a: #2a3134; --grid-b: #1f2527;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15191b; --stage-a: #2b3336; --stage-b: #171c1e; --panel: #1c2224; --raise: #252c2f; --line: #343d40;
+  --fg: #f0ebe8; --muted: #9ba5a7; --accent: #ff8a5e; --accent-soft: #4b2b20; --on-accent: #241008; --gold: #d9a066;
+  --grid-a: #2a3134; --grid-b: #1f2527;
+  color-scheme: dark;
+}
+
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+*, *::before, *::after { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+.app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 21.5rem;
+  gap: 16px;
+  padding-block: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+
+/* ---------------------------------------------------------------- stage */
+.stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 22px;
+  border: 1px solid var(--line);
+  background: radial-gradient(120% 85% at 50% 28%, var(--stage-a), var(--stage-b));
+}
+.stage[data-bg="plain"] { background: var(--grid-a); }
+.stage[data-bg="green"] { background: var(--chroma); }
+.stage[data-bg="grid"] {
+  background-color: var(--grid-a);
+  background-image: linear-gradient(45deg, var(--grid-b) 25%, transparent 25%, transparent 75%, var(--grid-b) 75%),
+    linear-gradient(45deg, var(--grid-b) 25%, transparent 25%, transparent 75%, var(--grid-b) 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 12px 12px;
+}
+#view {
+  position: absolute; inset: 0; width: 100%; height: 100%; display: block;
+  touch-action: pan-y; cursor: pointer; opacity: 0; transition: opacity .5s ease;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 56px), transparent);
+}
+.stage.ready #view { opacity: 1; }
+.stage[data-bg="green"] #view, .stage[data-bg="grid"] #view { -webkit-mask-image: none; mask-image: none; }
+
+.plate { position: absolute; top: 18px; left: 22px; right: 22px; pointer-events: none; display: flex; align-items: center; gap: 10px; }
+.plate svg { flex: none; width: 30px; height: 30px; }
+.plate h1 { margin: 0; font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; letter-spacing: .08em; line-height: 1.1; }
+.plate p { margin: 2px 0 0; color: var(--muted); font-size: .78rem; letter-spacing: .06em; }
+.stage[data-bg="green"] .plate, .stage[data-bg="green"] .hint { display: none; }
+
+.framing {
+  position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%);
+  display: flex; gap: 2px; padding: 3px; border-radius: 999px;
+  background: var(--panel);
+  background: color-mix(in srgb, var(--panel) 86%, transparent); border: 1px solid var(--line);
+  backdrop-filter: blur(8px);
+}
+.framing button {
+  border: 0; background: transparent; color: var(--muted); font: inherit; font-size: .82rem;
+  padding: 6px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+}
+.framing button[aria-pressed="true"] { background: var(--fg); color: var(--panel); }
+.hint {
+  position: absolute; left: 22px; bottom: 64px; margin: 0; max-width: 15em; color: var(--muted); font-size: .8rem;
+  transition: opacity .6s ease; pointer-events: none;
+}
+.hint.seen { opacity: 0; }
+.loading {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 24px; text-align: center;
+  color: var(--muted); font-size: .95rem; letter-spacing: .06em;
+}
+
+/* ---------------------------------------------------------------- panel */
+.panel {
+  min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  background: var(--panel); border: 1px solid var(--line); border-radius: 22px;
+  padding: 6px 18px 18px;
+}
+.panel section { padding: 14px 0 16px; border-bottom: 1px solid var(--line); display: grid; gap: 10px; }
+.panel section:last-child { border-bottom: 0; padding-bottom: 0; }
+.panel h2 {
+  margin: 0; font-size: .74rem; font-weight: 700; letter-spacing: .22em; color: var(--muted);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 26px;
+}
+.chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.chip {
+  font: inherit; font-size: .86rem; padding: 8px 0; border-radius: 10px; cursor: pointer;
+  background: var(--raise); color: var(--fg); border: 1px solid transparent; white-space: nowrap;
+}
+.chip:hover { border-color: var(--line); }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--fg); font-weight: 500; }
+
+.switches { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+.switch { display: flex; align-items: center; gap: 9px; cursor: pointer; font-size: .88rem; min-width: 0; }
+.switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.switch i {
+  flex: none; width: 34px; height: 20px; border-radius: 999px; background: var(--line); position: relative; transition: background .2s;
+}
+.switch i::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--panel); transition: transform .2s;
+}
+.switch input:checked + i { background: var(--accent); }
+.switch input:checked + i::after { transform: translateX(14px); }
+.switch input:focus-visible + i { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.line { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 12px; font-size: .88rem; }
+input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; height: 20px; }
+
+.swatches { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.swatch {
+  font: inherit; font-size: .8rem; color: var(--fg); cursor: pointer; padding: 6px 0 7px; border-radius: 10px;
+  background: var(--raise); border: 1px solid transparent; display: grid; justify-items: center; gap: 5px;
+}
+.swatch span { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--line); }
+.swatch[data-bg="studio"] span { background: radial-gradient(circle at 50% 30%, var(--stage-a), var(--stage-b)); }
+.swatch[data-bg="plain"] span { background: var(--grid-a); }
+.swatch[data-bg="green"] span { background: var(--chroma); }
+.swatch[data-bg="grid"] span { background: conic-gradient(var(--grid-b) 25%, var(--grid-a) 0 50%, var(--grid-b) 0 75%, var(--grid-a) 0); }
+.swatch[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+
+.ghost {
+  font: inherit; font-size: .76rem; letter-spacing: .04em; padding: 3px 10px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: var(--accent); border: 1px solid var(--accent);
+}
+.ghost:disabled { color: var(--muted); border-color: var(--line); cursor: default; }
+.note { margin: 0; color: var(--muted); font-size: .78rem; }
+.pgroup { display: grid; gap: 8px; }
+.pgroup + .pgroup { margin-top: 6px; }
+.pgroup h3 { margin: 0; font-size: .8rem; font-weight: 700; color: var(--gold); letter-spacing: .1em; }
+.prow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: baseline; column-gap: 8px; row-gap: 0; cursor: pointer; }
+.prow input { grid-column: 1 / -1; }
+.pname { font-size: .86rem; }
+.pid { font-family: var(--font-mono); font-size: .68rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pval { font-family: var(--font-mono); font-size: .74rem; font-variant-numeric: tabular-nums; color: var(--muted); min-width: 3.4em; text-align: right; }
+.prow.pinned .pval { color: var(--accent); }
+.prow.pinned .pname::after { content: " · 手动"; color: var(--accent); font-size: .72rem; }
+
+button:focus-visible, .chip:focus-visible, .swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 860px) {
+  html, body { height: auto; }
+  .app { height: auto; grid-template-columns: minmax(0, 1fr); }
+  .stage { height: min(74svh, 150vw); min-height: 420px; }
+  .panel { overflow: visible; }
+  .plate h1 { font-size: 1.35rem; }
+  .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #view, .hint, .switch i, .switch i::after { transition: none; }
+}
+</style>
+<!--BODY-->
+<div class="app">
+  <section class="stage" id="stage" data-bg="studio" aria-label="模型舞台">
+    <canvas id="view" role="img" aria-label="橙色长发、黑白礼裙的少女 Live2D 模型，会眨眼、呼吸并看向指针"></canvas>
+    <div class="plate">
+      <svg viewBox="-16 -16 32 32" aria-hidden="true">
+        <g fill="var(--accent)" stroke="var(--fg)" stroke-width=".7" stroke-linejoin="round">
+          <path d="M0-15 3.2-6 0-3-3.2-6Z"/><path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(30)"/>
+          <path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(60)"/><path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(90)"/>
+          <path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(120)"/><path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(150)"/>
+          <path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(180)"/><path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(210)"/>
+          <path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(240)"/><path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(270)"/>
+          <path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(300)"/><path d="M0-15 3.2-6 0-3-3.2-6Z" transform="rotate(330)"/>
+        </g>
+        <circle r="4.4" fill="var(--gold)" stroke="var(--fg)" stroke-width=".7"/>
+      </svg>
+      <div>
+        <h1>橙花少女</h1>
+        <p>Live2D 风格可动模型</p>
+      </div>
+    </div>
+    <p class="hint" id="hint">移动指针，她会看向你。点一下她的头或裙子试试。</p>
+    <div class="framing" role="group" aria-label="取景">
+      <button type="button" id="frame-full" data-frame="full" aria-pressed="true">全身</button>
+      <button type="button" id="frame-half" data-frame="half" aria-pressed="false">半身</button>
+      <button type="button" id="frame-face" data-frame="face" aria-pressed="false">特写</button>
+    </div>
+    <div class="loading" id="loading">正在载入模型…</div>
+  </section>
+
+  <aside class="panel" aria-label="控制面板">
+    <section>
+      <h2>表情</h2>
+      <div class="chips" id="expressions"></div>
+    </section>
+    <section>
+      <h2>动作</h2>
+      <div class="switches">
+        <label class="switch" for="opt-follow"><input type="checkbox" id="opt-follow"><i></i>视线跟随</label>
+        <label class="switch" for="opt-idle"><input type="checkbox" id="opt-idle"><i></i>待机摇摆</label>
+        <label class="switch" for="opt-blink"><input type="checkbox" id="opt-blink"><i></i>自动眨眼</label>
+        <label class="switch" for="opt-breath"><input type="checkbox" id="opt-breath"><i></i>呼吸</label>
+        <label class="switch" for="opt-talk"><input type="checkbox" id="opt-talk"><i></i>说话演示</label>
+      </div>
+      <label class="line" for="wind">风力<input type="range" id="wind" min="0" max="1" step="0.01"></label>
+      <p class="note">轻点她的头或裙子会有反应。</p>
+    </section>
+    <section>
+      <h2>背景</h2>
+      <div class="swatches">
+        <button type="button" class="swatch" id="bg-studio" data-bg="studio" aria-pressed="true"><span></span>影棚</button>
+        <button type="button" class="swatch" id="bg-plain" data-bg="plain" aria-pressed="false"><span></span>纯色</button>
+        <button type="button" class="swatch" id="bg-green" data-bg="green" aria-pressed="false"><span></span>绿幕</button>
+        <button type="button" class="swatch" id="bg-grid" data-bg="grid" aria-pressed="false"><span></span>透明格</button>
+      </div>
+    </section>
+    <section>
+      <h2>参数<button type="button" class="ghost" id="unpin" disabled>恢复自动</button></h2>
+      <p class="note">拖动滑块即可手动接管该参数。</p>
+      <div id="params"></div>
+    </section>
+  </aside>
+</div>
+<script>/*__DATA__*/</script>
+<script>/*__JS__*/</script>
