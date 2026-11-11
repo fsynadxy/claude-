@@ -123,7 +123,7 @@
         const dims = MESH[e.id] || (e.id.startsWith('eye') ? [8, 6] : e.id.startsWith('mouth') ? [8, 4] : e.id.startsWith('brow') ? [6, 2] : [2, 2]);
         const cols = dims[0], rows = dims[1], n = (cols + 1) * (rows + 1);
         const part = {
-          id: e.id, tex: e.tex, z: e.z, group: e.group, cols, rows, n,
+          id: e.id, tex: e.tex, z: e.z, group: e.group, s: e.s, cols, rows, n,
           rest: new Float32Array(n * 2), pos: new Float32Array(n * 2), uv: new Float32Array(n * 2),
           idx: new Uint16Array(cols * rows * 6),
           opacity: e.opacity === undefined ? 1 : e.opacity, visible: !e.hidden, clip: null,
@@ -200,11 +200,11 @@
       this.strands = {
         hair_side_r: { root: [P.hair_side_r.x0 + 203 * P.hair_side_r.w / 296, P.hair_side_r.y0 + 4], len: P.hair_side_r.h, p1: 1.5, p2: 2.8, stiff: [0.02, 0.3], attach: 'head', depth: 0.02, curv: 0.7 },
         hair_side_l: { root: [P.hair_side_l.x0 + 52 * P.hair_side_l.w / 255, P.hair_side_l.y0 + 4], len: P.hair_side_l.h, p1: 1.5, p2: 2.8, stiff: [0.02, 0.3], attach: 'head', depth: 0.02, curv: 0.7 },
-        acc_hair_flower: { root: [P.acc_hair_flower.x0 + 85 * 0.64, P.acc_hair_flower.y0 + 95 * 0.64], len: P.acc_hair_flower.y1 - (P.acc_hair_flower.y0 + 95 * 0.64), p1: 1.6, p2: 2.6, stiff: [0.22, 0.55], attach: 'head', depth: 0.06, curv: 0.9 },
+        acc_hair_flower: { root: [P.acc_hair_flower.x0 + 85 * P.acc_hair_flower.s, P.acc_hair_flower.y0 + 95 * P.acc_hair_flower.s], len: P.acc_hair_flower.y1 - (P.acc_hair_flower.y0 + 95 * P.acc_hair_flower.s), p1: 1.6, p2: 2.6, stiff: [0.22, 0.55], attach: 'head', depth: 0.06, curv: 0.9 },
         acc_earring: { root: [P.acc_earring.cx, P.acc_earring.y0 + 3], len: P.acc_earring.h, p1: 1, p2: 2, stiff: [0, 0.08], attach: 'head', depth: -0.02, curv: 1 },
-        acc_chest_bow: { root: [P.acc_chest_bow.x0 + 179 * 0.63, P.acc_chest_bow.y0 + 90 * 0.63], len: P.acc_chest_bow.y1 - (P.acc_chest_bow.y0 + 90 * 0.63), p1: 1.7, p2: 2.6, stiff: [0.2, 0.6], attach: 'body' },
+        acc_chest_bow: { root: [P.acc_chest_bow.x0 + 179 * P.acc_chest_bow.s, P.acc_chest_bow.y0 + 90 * P.acc_chest_bow.s], len: P.acc_chest_bow.y1 - (P.acc_chest_bow.y0 + 90 * P.acc_chest_bow.s), p1: 1.7, p2: 2.6, stiff: [0.2, 0.6], attach: 'body' },
         acc_sash: { root: [P.acc_sash.x0 + 70, P.acc_sash.y0 + 6], len: P.acc_sash.h, p1: 1.5, p2: 2.8, stiff: [0.0, 0.14], attach: 'body' },
-        acc_chain: { root: [P.acc_chain.x0 + 247, P.acc_chain.y0 + 46], len: P.acc_chain.y1 - (P.acc_chain.y0 + 46), p1: 1.2, p2: 2.2, stiff: [0.0, 0.1], attach: 'mesh' },
+        acc_chain: { root: [P.acc_chain.x0 + 313 * P.acc_chain.s, P.acc_chain.y0 + 58 * P.acc_chain.s], len: P.acc_chain.y1 - (P.acc_chain.y0 + 58 * P.acc_chain.s), p1: 1.2, p2: 2.2, stiff: [0.0, 0.1], attach: 'mesh' },
         arm_r: { root: [P.arm_r.x1 - 50, P.arm_r.y0 + 20], len: P.arm_r.h, p1: 1, p2: 2, stiff: [0, 0.01], attach: 'body' },
         arm_l: { root: [P.arm_l.x0 + 50, P.arm_l.y0 + 20], len: P.arm_l.h, p1: 1, p2: 2, stiff: [0, 0.01], attach: 'body' },
       };

@@ -140,6 +140,54 @@ def lengthen_hair(part, y0=420, gain=0.5, widen=0.09):
     return np.pad(out, ((pad, pad), (pad, pad), (0, 0)))
 
 
+def open_fringe(part, d_left=40.0, d_right=17.0):
+    """Widen the gap in the fringe so both eyes sit inside it.
+
+    The supplied fringe leaves a face window narrower than the eye span of the
+    reference. Slide the inner edge of each side lock outward (left more than
+    right, the window is off-centre) with a smooth displacement field: zero at
+    the outer silhouette, zero above the point where the window opens, and
+    fading out across the transparent gap so the centre strand stays put.
+    """
+    import cv2
+    pad = PAD
+    src = part[pad:-pad, pad:-pad].astype(np.float32)
+    h, w = src.shape[:2]
+
+    def sm(a, b, x):
+        t = np.clip((x - a) / (b - a), 0, 1)
+        return t * t * (3 - 2 * t)
+
+    # left edge of the centre strand, by row (where the left window ends)
+    strand_y = np.array([0, 360, 390, 420, 450, 480, 510, 540, h], np.float32)
+    strand_x = np.array([300, 300, 312, 325, 341, 360, 405, 440, 440], np.float32)
+
+    def disp(x, y):
+        xe = np.interp(y, strand_y, strand_x)
+        inner_l, outer_l = 264.0, 60.0
+        wl = np.where(x <= inner_l,
+                      0.5 * (1 - np.cos(np.pi * np.clip((x - outer_l) / (inner_l - outer_l), 0, 1))),
+                      0.5 * (1 + np.cos(np.pi * np.clip((x - inner_l) / np.maximum(xe - inner_l, 1), 0, 1))))
+        inner_r, outer_r, strand_r = 608.0, 772.0, 490.0
+        wr = np.where(x >= inner_r,
+                      0.5 * (1 + np.cos(np.pi * np.clip((x - inner_r) / (outer_r - inner_r), 0, 1))),
+                      0.5 * (1 - np.cos(np.pi * np.clip((x - strand_r) / (inner_r - strand_r), 0, 1))))
+        return -d_left * sm(350, 470, y) * wl + d_right * sm(300, 440, y) * wr
+
+    Y, X = np.mgrid[0:h, 0:w].astype(np.float32)
+    xs = X.copy()
+    for _ in range(10):                      # invert x + disp(x) = X
+        xs = X - disp(xs, Y)
+    prem = src.copy()
+    prem[..., :3] *= prem[..., 3:4] / 255.0
+    out = cv2.remap(prem, xs.astype(np.float32), Y, cv2.INTER_CUBIC, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+    al = np.clip(out[..., 3:4], 0, 255)
+    out[..., :3] = np.where(al > 0.5, out[..., :3] * 255.0 / np.maximum(al, 0.5), 0)
+    out = np.clip(out, 0, 255)
+    out[..., 3:4] = al
+    return np.pad(out.round().astype(np.uint8), ((pad, pad), (pad, pad), (0, 0)))
+
+
 def tight(img):
     a = img[..., 3] > 8
     ys, xs = np.nonzero(a)
@@ -200,7 +248,8 @@ def main():
     put('hair_back', lengthen_hair(d), o, '01_hair_back')
     simple('hair_side_r', '02_hair_side', (100, 90, 500, 1440))     # viewer's left
     simple('hair_side_l', '02_hair_side', (600, 90, 920, 1440))     # viewer's right
-    simple('hair_front', '03_hair_front', (100, 40, 930, 760))
+    d, o = cut('03_hair_front', (100, 40, 930, 760))
+    put('hair_front', open_fringe(d), o, '03_hair_front')
 
     # ---- head -------------------------------------------------------------
     face, neck = split_head()

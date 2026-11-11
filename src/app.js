@@ -7,9 +7,9 @@
   const $ = (id) => document.getElementById(id);
 
   const FRAMES = {
-    full: [0, -44, 1024, 1500],
-    half: [170, 6, 910, 1010],
-    face: [322, 28, 762, 566],
+    full: [-18, -44, 1098, 1500],   // centred on the body; the hair fans out wider on her left
+    half: [170, -14, 910, 1010],
+    face: [300, -4, 784, 588],
   };
   const FLOOR = 1500;             // nothing below this line is ever shown (art is cropped there)
 

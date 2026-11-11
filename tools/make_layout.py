@@ -13,9 +13,10 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = json.load(open(os.path.join(ROOT, 'model', 'parts.json')))
 
-HEAD_SCALE = 0.405
-HEAD_ORIGIN = (334.6, 17.8)
-EYE_REL = 1.0           # eye sheet -> head space
+HEAD_SCALE = 0.43
+CHIN = (542.0, 437.0)                       # model-space position of the chin tip (head-space 512, 1035)
+HEAD_ORIGIN = (CHIN[0] - 512 * HEAD_SCALE, CHIN[1] - 1035 * HEAD_SCALE)
+EYE_REL = 1.04          # eye sheet -> head space
 MOUTH_REL = 0.47        # mouth sheet -> head space
 
 parts = []
@@ -59,7 +60,11 @@ def head_c(pid, cx, cy, rel, z, **kw):
 
 
 # ---------------------------------------------------------------- hair (back)
-add('hair_back', 542 - cw('hair_back') / 2 * 0.79 - 6, 50, 0.79, 10, 'head')
+# The crown of the back hair is not centred in its texture: it sits at content
+# x = 572. Line it up with the dome of the fringe, a touch below its top edge.
+HAIR_CX = 498                               # head-space x of the hair dome (fringe is combed off-centre)
+BACK_REL = 1.9
+head('hair_back', HAIR_CX - 572 * BACK_REL, 100, BACK_REL, 10)
 
 # ---------------------------------------------------------------- body
 add('arm_r', 112, 610, 0.9, 20, 'body')
@@ -77,7 +82,7 @@ head_c('blush_r', 330, 800, 1.0, 105, tex='blush', opacity=0.0)
 head_c('blush_l', 694, 800, 1.0, 105, tex='blush', opacity=0.0)
 
 EYE_Y = 672            # head-space y of the eye-white top edge
-EYE_DX = 142           # head-space distance of eye centre from the face axis
+EYE_DX = 152           # head-space distance of eye centre from the face axis
 FACE_CX = 512
 
 
@@ -118,9 +123,11 @@ for m, dy in [('mouth_closed', 0), ('mouth_smile', 2), ('mouth_sad', -2), ('mout
 
 head('hair_side_r', 250 - 203 * 1.22, 505, 1.22, 140)
 head('hair_side_l', 774 - 52 * 1.22, 505, 1.22, 141)
-head('hair_front', 512 - cw('hair_front') * 1.14 / 2 - 34, 98, 1.14, 150)
-add('acc_earring', hx(826) - 21 * 0.5, hy(838), 0.5, 160, 'head')
-add('acc_hair_flower', 722 - 85 * 0.64, 172 - 95 * 0.64, 0.64, 170, 'head')
+head('hair_front', 512 - cw('hair_front') * 1.14 / 2 - 26, 98, 1.14, 150)
+head('acc_earring', 826 - 21 * 1.23, 838, 1.23, 160)
+# flower: centre just inside the hair silhouette so it reads as pinned on
+FLOWER_REL = 1.58
+head('acc_hair_flower', 862 - 85 * FLOWER_REL, 366 - 95 * FLOWER_REL, FLOWER_REL, 170)
 
 layout = {
     'canvas': [1024, 1536],
