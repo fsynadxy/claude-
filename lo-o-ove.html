@@ -1,0 +1,1529 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>LO-O-OVE</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;1,6..96,400&family=DM+Mono:wght@300;400&family=Noto+Serif+SC:wght@300;400;600&display=swap">
+<style>
+/* Layout: one micrograph plate. The field (canvas) is full-bleed and holds the specimen; instrument captions sit in
+   the top corners with the course of the illness between them; one subtitle line of voice rides above an ECG strip. */
+:root {
+  /* 明场 brightfield, H&E: eosin takes to what is soft, hematoxylin to what is dense */
+  --field: #f2f2f7;
+  --ink: #17122e;
+  --ink-2: rgba(23, 18, 46, .74);
+  --ink-3: rgba(23, 18, 46, .52);
+  --rule: rgba(23, 18, 46, .17);
+  --eosin: #cf2264;
+  --hema: #4338a0;
+  --hema-deep: #221a5c;
+  --sclera-0: #fffdfd;
+  --sclera-1: #ebc3d3;
+  --void: #110c25;
+  --glint: #ffffff;
+  --vignette: rgba(52, 42, 110, .17);
+  --grain-o: .55;
+  --glow: 0;
+  --stamp-blend: multiply;
+  --voice-w: 400;
+  --mode: "明场 H&E";
+  --display: "Bodoni Moda", "Didot", "Bodoni 72", "Bodoni MT", "Times New Roman", serif;
+  --voice: "Noto Serif SC", "Songti SC", "STSong", "Source Han Serif SC", "SimSun", serif;
+  --mono: "DM Mono", "SFMono-Regular", Menlo, Consolas, "Noto Serif SC", "Songti SC", monospace;
+}
+/* 荧光 fluorescence: the same specimen with the lights off */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --field: #05060d; --ink: #e8edf8; --ink-2: rgba(232, 237, 248, .74); --ink-3: rgba(232, 237, 248, .5);
+    --rule: rgba(232, 237, 248, .17); --eosin: #ff4d97; --hema: #5d6dff; --hema-deep: #1b1f70;
+    --sclera-0: #cdd5ee; --sclera-1: #14163a; --void: #020207; --glint: #ffffff;
+    --vignette: rgba(0, 0, 0, .66); --grain-o: .6; --glow: 1; --stamp-blend: screen; --voice-w: 300; --mode: "荧光 DAPI";
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --field: #05060d; --ink: #e8edf8; --ink-2: rgba(232, 237, 248, .74); --ink-3: rgba(232, 237, 248, .5);
+  --rule: rgba(232, 237, 248, .17); --eosin: #ff4d97; --hema: #5d6dff; --hema-deep: #1b1f70;
+  --sclera-0: #cdd5ee; --sclera-1: #14163a; --void: #020207; --glint: #ffffff;
+  --vignette: rgba(0, 0, 0, .66); --grain-o: .6; --glow: 1; --stamp-blend: screen; --voice-w: 300; --mode: "荧光 DAPI";
+  color-scheme: dark;
+}
+
+html { box-sizing: border-box; height: 100%; overflow: hidden; }
+body {
+  height: 100%; overflow: hidden; overscroll-behavior: none;
+  background: var(--field); color: var(--ink);
+  font-family: var(--mono); font-weight: 300; -webkit-font-smoothing: antialiased;
+}
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.plate {
+  position: relative; height: 100%; box-sizing: border-box; overflow: hidden;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 14px;
+}
+#stage { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+@media (hover: hover) and (pointer: fine) { #stage { cursor: none; } }
+
+.vignette, .grain { position: fixed; pointer-events: none; z-index: 1; transition: opacity 1.2s ease; }
+.vignette { inset: 0; background: radial-gradient(ellipse 78% 72% at 50% 47%, transparent 52%, var(--vignette) 100%); }
+.grain { inset: -160px; background-size: 128px 128px; opacity: var(--grain-o); animation: grain .7s steps(1) infinite; }
+@keyframes grain {
+  0% { transform: translate(0, 0); } 20% { transform: translate(-37px, 51px); } 40% { transform: translate(64px, -23px); }
+  60% { transform: translate(-81px, -70px); } 80% { transform: translate(29px, 88px); }
+}
+.plate.cured .grain { opacity: 0; }
+.plate.cured .vignette { opacity: .25; }
+
+/* the rubber stamp that ends a case file */
+.stamp {
+  position: absolute; z-index: 2; left: 50%; top: 50%; translate: -50% -50%; rotate: -8deg; scale: 1.7; opacity: 0;
+  display: grid; justify-items: center; gap: .12em; padding: .2em .42em .22em .74em;
+  border: .07em solid var(--eosin); outline: .024em solid var(--eosin); outline-offset: .07em;
+  color: var(--eosin); font-family: var(--voice); font-weight: 600; font-size: 48px; line-height: 1.1; letter-spacing: .32em;
+  white-space: nowrap; pointer-events: none; mix-blend-mode: var(--stamp-blend);
+  -webkit-mask-size: 160px 160px; mask-size: 160px 160px;
+}
+.stamp small { font-family: var(--mono); font-weight: 400; font-size: .2em; letter-spacing: .3em; margin-right: -.3em; }
+.stamp.on { opacity: .88; scale: 1; transition: scale .13s cubic-bezier(.2, 1.5, .4, 1), opacity .07s linear; }
+.stamp.run { opacity: 0; translate: -50% calc(-50% + 12px); filter: blur(1.5px); transition: opacity 2.8s ease-in, translate 2.8s ease-in, filter 2.8s ease-in; }
+
+/* instrument captions */
+.hud {
+  position: relative; z-index: 3; height: 100%; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+  pointer-events: none; font-size: 10.5px; line-height: 1.62; letter-spacing: .08em; color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+.hud button { pointer-events: auto; }
+button:focus-visible { outline: 1px solid var(--eosin); outline-offset: 2px; }
+.top { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px 24px; align-items: start; }
+.cap { margin: 0; display: grid; gap: 1px; min-width: 0; }
+.cap > div { display: flex; gap: 1.1em; min-width: 0; }
+.cap dt { color: var(--ink-3); white-space: nowrap; }
+.cap dd { margin: 0; color: var(--ink); white-space: nowrap; }
+.case dt { min-width: 12em; }
+.scope { justify-self: end; }
+.scope > div { justify-content: flex-end; }
+.scope dd { min-width: 4.4em; text-align: right; }
+.en { letter-spacing: .15em; }
+.formula { font-family: var(--display); font-size: 1.34em; letter-spacing: .1em; line-height: 1; }
+.formula sup { font-style: italic; font-size: .7em; letter-spacing: 0; }
+.mode::before { content: var(--mode); }
+
+.course { justify-self: center; display: grid; gap: 3px; justify-items: center; text-align: center; }
+.course ol { list-style: none; margin: 0; padding: 0; display: flex; border-top: 1px solid var(--rule); }
+.course li { position: relative; }
+.course li::before { content: ""; position: absolute; left: 50%; top: -1px; width: 1px; height: 5px; background: var(--ink-3); }
+.course button {
+  font-family: var(--display); font-size: 15px; line-height: 1; letter-spacing: .06em; color: var(--ink-3);
+  background: none; border: 0; padding: 12px 0 5px; width: 3.1em; cursor: pointer;
+}
+.course button:hover { color: var(--ink); }
+.course li.past button { color: var(--ink-2); }
+.course li.now button { color: var(--eosin); }
+.course li.now::before { width: 2px; height: 9px; margin-left: -1px; background: var(--eosin); }
+.course p { margin: 0; color: var(--ink); }
+
+.bottom { display: grid; gap: 10px; }
+.voice {
+  margin: 0 auto; max-width: 32em; min-height: 3.5em; display: flex; align-items: flex-end; justify-content: center;
+  text-align: center; text-wrap: balance; font-family: var(--voice); font-weight: var(--voice-w);
+  font-size: clamp(16px, 11px + 1.05vw, 25px); line-height: 1.75; letter-spacing: .14em; color: var(--ink);
+}
+.voice span::after {
+  content: ""; display: inline-block; width: 1px; height: 1.05em; margin-left: .2em; vertical-align: -.16em;
+  background: var(--eosin); opacity: 0;
+}
+.voice.typing span::after { opacity: 1; }
+.tools { display: flex; align-items: flex-end; gap: 18px; min-height: 30px; }
+.log { flex: 1; min-width: 0; list-style: none; margin: 0; padding: 0; font-size: 10px; color: var(--ink-3); }
+.log li { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.log li:last-child { color: var(--ink-2); }
+.scale { margin-left: auto; display: grid; justify-items: end; gap: 3px; white-space: nowrap; }
+.scale i { display: block; height: 2px; width: 80px; background: var(--ink); }
+.btns { display: flex; gap: 6px; }
+.btns button {
+  font: inherit; letter-spacing: .14em; color: var(--ink-2); background: none; border: 1px solid var(--rule);
+  border-radius: 0; padding: .62em 1em; cursor: pointer; white-space: nowrap;
+}
+.btns button:hover { color: var(--ink); border-color: var(--ink-3); }
+.btns button[aria-pressed="true"] { color: var(--eosin); border-color: var(--eosin); }
+.ecg {
+  height: 46px; display: flex; justify-content: space-between; align-items: flex-start;
+  border-top: 1px solid var(--rule); padding-top: 3px; font-size: 9px; color: var(--ink-3);
+}
+
+@media (max-width: 900px) { .log { visibility: hidden; } }
+@media (max-width: 720px) {
+  .hud { font-size: 10px; letter-spacing: .05em; }
+  .top { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 12px; }
+  .course { grid-column: 1 / -1; grid-row: 2; }
+  .en { display: none; }
+  .case dt { min-width: 4.6em; }
+  .cap > div { gap: .8em; }
+  .ecg { height: 40px; }
+  .log { display: none; }
+}
+@media (max-height: 520px) {
+  .voice { min-height: 2em; }
+  .ecg { height: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grain { animation: none; }
+  .stamp.on { transition: none; }
+}
+</style>
+
+<main class="plate" id="plate" lang="zh-CN">
+  <h1 class="sr">LO-O-OVE</h1>
+  <canvas id="stage" role="img" aria-label="LO-O-OVE 这个词的显微图像。每个 O 都是一只注视着您的眼睛，连字符是缝线；O 会不断分裂。"></canvas>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="grain" id="grain" aria-hidden="true"></div>
+  <div class="stamp" id="stamp" aria-hidden="true">痊愈<small>CURED · 准予出院</small></div>
+
+  <div class="hud" id="hud">
+    <header class="top" id="hud-top">
+      <dl class="cap case">
+        <div><dt>病例 <span class="en">CASE</span></dt><dd id="c-case">0214 · 初诊</dd></div>
+        <div><dt>标本 <span class="en">SPECIMEN</span></dt><dd><span class="formula">LO<sup>n</sup>VE</span>，n = <span id="c-n">003</span></dd></div>
+        <div><dt>观察对象 <span class="en">SUBJECT</span></dt><dd>您</dd></div>
+      </dl>
+      <nav class="course" aria-label="病程">
+        <ol id="course">
+          <li><button type="button" data-stage="I" aria-label="第一期 潜伏期">I</button></li>
+          <li><button type="button" data-stage="II" aria-label="第二期 前驱期">II</button></li>
+          <li><button type="button" data-stage="III" aria-label="第三期 发作期">III</button></li>
+          <li><button type="button" data-stage="IV" aria-label="第四期 慢性期">IV</button></li>
+          <li><button type="button" data-stage="V" aria-label="第五期 终末期">V</button></li>
+          <li><button type="button" data-stage="VI" aria-label="第六期 复发">VI</button></li>
+        </ol>
+        <p id="c-stage">潜伏期 <span class="en">INCUBATION</span></p>
+      </nav>
+      <dl class="cap scope">
+        <div><dt class="mode"></dt><dd id="c-mag">×40</dd></div>
+        <div><dt>心率 <span class="en">HR</span></dt><dd id="c-hr">---</dd></div>
+        <div><dt>固定 <span class="en">FIXATION</span></dt><dd id="c-fix">00:00</dd></div>
+        <div><dt>断线 <span class="en">TORN</span></dt><dd id="c-torn">00</dd></div>
+      </dl>
+    </header>
+    <div></div>
+    <footer class="bottom" id="hud-bottom">
+      <p class="voice" id="voice" aria-hidden="true"><span></span></p>
+      <p class="sr" id="voice-sr" aria-live="polite"></p>
+      <div class="tools">
+        <ol class="log" id="log" aria-hidden="true"></ol>
+        <div class="scale" aria-hidden="true"><i id="scale-bar"></i><span id="scale-txt">5 µm</span></div>
+        <div class="btns">
+          <button type="button" id="b-sound" aria-pressed="false">声音 关</button>
+          <button type="button" id="b-pause" aria-pressed="false">暂停</button>
+        </div>
+      </div>
+      <div class="ecg" id="ecg" aria-hidden="true"><span>II</span><span>25 mm/s</span></div>
+    </footer>
+  </div>
+</main>
+
+<script>
+/*
+ * LO-O-OVE ── 病程记录
+ *
+ * 病例 0214。主诉：有一个词，说不完。
+ * 每卡住一次，多出一个 O；每个 O 睁开，成为一只眼睛。
+ * 连字符是缝线。心电图按这个词的口吃在跳：L · O-O-O · V · E。
+ * 把词完整说出口即可痊愈；痊愈后无应答。患者因此拒绝痊愈。
+ *
+ * 读代码的人：您好。下面没有什么可藏的。除了那个词。
+ */
+(() => {
+  'use strict';
+
+  /* ───────── helpers ───────── */
+  const TAU = Math.PI * 2;
+  const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+  const rnd = (a = 1, b) => (b === undefined ? Math.random() * a : a + Math.random() * (b - a));
+  const pick = (arr) => arr[(Math.random() * arr.length) | 0];
+  const $ = (id) => document.getElementById(id);
+  const pad = (n, w) => String(Math.max(0, Math.round(n))).padStart(w, '0');
+  const clock = (s) => pad(Math.floor(s / 60), 2) + ':' + pad(Math.floor(s % 60), 2);
+  const gauss = (x, m, s) => Math.exp(-((x - m) * (x - m)) / (2 * s * s));
+  const mk = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  const cn = (n) => (n <= 10 ? CN[n] : n < 20 ? '十' + CN[n - 10] : String(n));
+  function spanText(sec) {
+    sec = Math.max(1, Math.round(sec));
+    if (sec < 60) return ` ${sec} 秒`;
+    if (sec < 3600) return ` ${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
+    if (sec < 172800) return ` ${Math.floor(sec / 3600)} 小时 ${Math.floor((sec % 3600) / 60)} 分`;
+    return ` ${Math.floor(sec / 86400)} 天`;
+  }
+
+  /* switches that only mean something when this is opened as a local file */
+  const Q = new URLSearchParams(location.search);
+  const DEV = { warp: Math.max(1, +Q.get('warp') || 1), stage: Q.get('stage'), theme: Q.get('theme') };
+  if (DEV.theme === 'dark' || DEV.theme === 'light') document.documentElement.dataset.theme = DEV.theme;
+  const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* 我记得您来过几次。记不住的时候，就当作第一次。 */
+  const memory = { visits: 1, gap: 0 };
+  try {
+    const m = JSON.parse(localStorage.getItem('lo-o-ove') || 'null');
+    if (m && m.visits > 0) { memory.visits = (m.visits | 0) + 1; memory.gap = (Date.now() - (m.last || Date.now())) / 1000; }
+    localStorage.setItem('lo-o-ove', JSON.stringify({ visits: memory.visits, last: Date.now() }));
+  } catch (e) { /* 没关系 */ }
+
+  /* ───────── palette: read from the CSS tokens, so the canvas follows the theme ───────── */
+  const C = {};
+  const hexRgb = (h) => {
+    h = h.replace('#', '');
+    if (h.length === 3) h = h.replace(/./g, '$&$&');
+    const n = parseInt(h, 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+  const mix = (a, b, t) => [0, 1, 2].map((i) => Math.round(a[i] + (b[i] - a[i]) * t));
+  function readPalette() {
+    const cs = getComputedStyle(document.documentElement);
+    const get = (k) => cs.getPropertyValue(k).trim();
+    const map = { field: '--field', ink: '--ink', eosin: '--eosin', hema: '--hema', hemaDeep: '--hema-deep',
+      sclera0: '--sclera-0', sclera1: '--sclera-1', void: '--void', glint: '--glint' };
+    for (const key in map) { C[key] = get(map[key]) || '#888888'; C[key + 'Rgb'] = hexRgb(C[key]); }
+    C.glow = get('--glow') === '1';
+  }
+
+  /* ───────── DOM + world ───────── */
+  const plate = $('plate'), cv = $('stage'), ctx = cv.getContext('2d', { alpha: false });
+  const stainCv = mk(2, 2), sctx = stainCv.getContext('2d');
+  const stampEl = $('stamp');
+  let W = 800, H = 600, DPR = 1;
+  const stageRect = { x: 0, y: 0, w: 100, h: 100 }, ecgRect = { x: 0, y: 0, w: 0, h: 0 };
+
+  const sim = { t: 0, acc: 0, last: 0, ff: false, paused: false };
+  const state = {
+    stage: 'I', stageT0: 0, cycle: 1, curing: false, cured: false, sterile: false, collapsing: false,
+    dilate: 0.4, rest: 1.3, threadsMax: 0, tighten: false, trail: false, torn: 0, watch: 0,
+  };
+  const layout = { cap: 100, ceil: Infinity, titleCap: 100, block: { x: 0, y: 0, w: 0, h: 0 } };
+  const growth = { on: false, gain: 1, acc: 0, full: false, min: 42, max: 160 };
+  const ptr = { x: 0, y: 0, px: 0, py: 0, has: false, inside: false, type: 'mouse', lastMove: -99, exitT: -99 };
+  const look = { x: 0, y: 0, front: 0, force: 0, real: false, idleSaid: false, grace: 0 };
+  const heart = { on: false, flat: false, bpm: 54, bpmT: 54, next: 0, beats: [], runs: [], rate: 0, lastBeat: -99 };
+  const ecg = { buf: new Float32Array(0), head: 0, speed: 105, total: 0 };
+  const stain = { fade: 0, ink: -999 };
+  let seq = [];
+  const threads = [], drips = [];
+  let threadTimer = 0;
+
+  /* ───────── letterforms: a didone built by hand, cap height = 1, y down ───────── */
+  const ADV = { L: 0.70, O: 1.08, H: 0.46, V: 0.92, E: 0.70 };
+  const MIDX = { L: 0.31, O: 0.54, H: 0.23, V: 0.45, E: 0.31 };
+  const TRACK = 0.075, LEAD = 1.2, STEM = 0.17;
+  const O = { cx: 0.54, cy: 0.5, RX: 0.5, RY: 0.515, a: 0.33, b: 0.475, ri: 0.21, mx: 0.17, my: 0.235 };
+  const TITLE = ['L', 'O', 'H', 'O', 'H', 'O', 'V', 'E'];
+  const hair = (s) => Math.max(0.026, 1.1 / s);
+
+  function drawL(t) {
+    ctx.beginPath(); ctx.rect(0.09, 0, STEM, 1); ctx.rect(0, 0, 0.35, t); ctx.rect(0, 1 - t, 0.62, t); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0.62, 1); ctx.lineTo(0.42, 1); ctx.lineTo(0.42, 1 - t);
+    ctx.quadraticCurveTo(0.59, 0.96, 0.606, 0.69); ctx.lineTo(0.62, 0.69); ctx.closePath(); ctx.fill();
+  }
+  function drawE(t) {
+    ctx.beginPath(); ctx.rect(0.09, 0, STEM, 1); ctx.rect(0, 0, 0.60, t); ctx.rect(0, 1 - t, 0.62, t);
+    ctx.rect(0.09 + STEM, 0.5 - t / 2, 0.2, t); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0.60, 0); ctx.lineTo(0.60, 0.29); ctx.lineTo(0.586, 0.29);
+    ctx.quadraticCurveTo(0.57, 0.04, 0.41, t); ctx.lineTo(0.41, 0); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0.62, 1); ctx.lineTo(0.42, 1); ctx.lineTo(0.42, 1 - t);
+    ctx.quadraticCurveTo(0.59, 0.96, 0.606, 0.69); ctx.lineTo(0.62, 0.69); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0.462, 0.365); ctx.lineTo(0.476, 0.365); ctx.lineTo(0.476, 0.635); ctx.lineTo(0.462, 0.635);
+    ctx.quadraticCurveTo(0.455, 0.52, 0.39, 0.5 + t / 2); ctx.lineTo(0.39, 0.5 - t / 2);
+    ctx.quadraticCurveTo(0.455, 0.48, 0.462, 0.365); ctx.closePath(); ctx.fill();
+  }
+  function drawV(t) {
+    ctx.beginPath(); ctx.rect(0, 0, 0.36, t); ctx.rect(0.69, 0, 0.21, t); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0.08, 0); ctx.lineTo(0.28, 0); ctx.lineTo(0.5397, 0.7214); ctx.lineTo(0.785, 0);
+    ctx.lineTo(0.82, 0); ctx.lineTo(0.48, 1); ctx.lineTo(0.44, 1); ctx.closePath(); ctx.fill();
+  }
+  function ring() {
+    ctx.beginPath(); ctx.ellipse(O.cx, O.cy, O.RX, O.RY, 0, 0, TAU);
+    ctx.moveTo(O.cx + O.a, O.cy); ctx.ellipse(O.cx, O.cy, O.a, O.b, 0, 0, TAU); ctx.fill('evenodd');
+  }
+  const LETTER = { L: drawL, V: drawV, E: drawE };
+
+  function glyph(type) {
+    return {
+      type, x: 0, y: 0, s: 0, w: ADV[type], tx: 0, ty: 0, ts: 0, tw: ADV[type], vx: 0, vy: 0, vs: 0, vw: 0,
+      pulse: 0, placed: false, eye: null, stitch: -1, thread: null, divideAt: 0,
+    };
+  }
+  const Os = () => seq.filter((g) => g.type === 'O');
+  const countO = () => { let n = 0; for (const g of seq) if (g.type === 'O') n++; return n; };
+
+  /* ───────── layout: set the word like text. Break only after a hyphen; wrap first, then shrink ───────── */
+  function chunksOf(list) {
+    const out = []; let cur = { items: [], w: 0 };
+    for (const g of list) {
+      cur.items.push(g); cur.w += ADV[g.type] + TRACK;
+      if (g.type === 'H') { out.push(cur); cur = { items: [], w: 0 }; }
+    }
+    if (cur.items.length) out.push(cur);
+    return out;
+  }
+  function breakLines(chunks, cap, maxW, single) {
+    const lines = []; let line = null;
+    for (const ch of chunks) {
+      if (!line || (!single && (line.w + ch.w - TRACK) * cap > maxW + 0.5)) { line = { chunks: [], w: 0 }; lines.push(line); }
+      line.chunks.push(ch); line.w += ch.w;
+    }
+    return lines;
+  }
+  function feasible(lines, cap, rect) {
+    let wide = 0; for (const l of lines) wide = Math.max(wide, l.w - TRACK);
+    return wide * cap <= rect.w + 0.5 && ((lines.length - 1) * LEAD + 1.03) * cap <= rect.h + 0.5;
+  }
+  function fit(list, rect, ceil, single) {
+    const chunks = chunksOf(list);
+    let hi = Math.min(ceil, rect.h, rect.w), lo = 2, best = null;
+    let lines = breakLines(chunks, hi, rect.w, single);
+    if (feasible(lines, hi, rect)) return { cap: hi, lines };
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2; lines = breakLines(chunks, mid, rect.w, single);
+      if (feasible(lines, mid, rect)) { lo = mid; best = { cap: mid, lines }; } else hi = mid;
+    }
+    return best || { cap: lo, lines: breakLines(chunks, lo, rect.w, single) };
+  }
+  function applyLayout(f, walk) {
+    const cap = f.cap; let wide = 0;
+    for (const l of f.lines) wide = Math.max(wide, l.w - TRACK);
+    const bw = wide * cap, bh = ((f.lines.length - 1) * LEAD + 1) * cap;
+    const x0 = stageRect.x + (stageRect.w - bw) / 2, y0 = stageRect.y + (stageRect.h - bh) / 2;
+    f.lines.forEach((l, i) => {
+      let nh = 0; for (const ch of l.chunks) for (const g of ch.items) if (g.type === 'H') nh++;
+      const slack = wide - (l.w - TRACK);
+      /* justified: the sutures take up the slack */
+      const extra = i < f.lines.length - 1 && nh > 0 && slack / nh <= ADV.H * 0.75 ? slack / nh : 0;
+      let x = x0;
+      for (const ch of l.chunks) for (const g of ch.items) {
+        g.tw = ADV[g.type] + (g.type === 'H' ? extra : 0);
+        g.tx = x; g.ty = y0 + i * LEAD * cap; g.ts = cap;
+        if (!walk && g.placed && g.li !== undefined && g.li !== i && Math.hypot(g.tx - g.x, g.ty - g.y) > cap * 2.6) {
+          /* too far to walk: it closes here and opens there, the way a word moves to the next line */
+          const mid = g.type === 'H' ? g.tw / 2 : MIDX[g.type];
+          g.s = cap * 0.5; g.x = g.tx + mid * cap * 0.5; g.y = g.ty + cap * 0.25; g.vx = g.vy = g.vs = 0;
+          if (g.eye && g.eye.awake) g.eye.shut = Math.max(g.eye.shut, 0.2);
+        }
+        g.li = i;
+        x += (g.tw + TRACK) * cap;
+      }
+    });
+    layout.cap = cap; layout.block = { x: x0, y: y0, w: bw, h: bh };
+  }
+  const titleCapNow = () => fit(TITLE.map((t) => ({ type: t })), stageRect, Infinity, W / H > 1.15).cap;
+  function relayout(snap) {
+    const n = countO(); let f;
+    if (n <= 3) {
+      f = fit(seq, stageRect, layout.titleCap, state.cured || W / H > 1.15);
+      layout.ceil = layout.titleCap;
+    } else {
+      f = fit(seq, stageRect, layout.ceil, false);
+      layout.ceil = f.cap;
+    }
+    applyLayout(f);
+    if (snap) for (const g of seq) { g.x = g.tx; g.y = g.ty; g.s = g.ts; g.w = g.tw; g.vx = g.vy = g.vs = g.vw = 0; g.placed = true; }
+  }
+
+  /* ───────── sprites: iris, sclera, stain ───────── */
+  const SPR = { iris: [], cloud: null, sclera: [], wash: null, halo: null };
+  function makeIris(v, cloudy) {
+    const S = 192, c = S / 2, R = c - 2, cvs = mk(S, S), x = cvs.getContext('2d');
+    const light = cloudy ? mix(C.sclera0Rgb, C.hemaRgb, 0.12) : mix(C.hemaRgb, [255, 255, 255], 0.38 + v * 0.06);
+    const mid = cloudy ? mix(C.sclera0Rgb, C.hemaRgb, 0.3) : C.hemaRgb;
+    const deep = cloudy ? mix(C.sclera1Rgb, C.hemaRgb, 0.45) : C.hemaDeepRgb;
+    let g = x.createRadialGradient(c, c, R * 0.12, c, c, R);
+    g.addColorStop(0, rgba(light, 1)); g.addColorStop(0.5, rgba(mid, 1)); g.addColorStop(0.88, rgba(deep, 1));
+    g.addColorStop(1, rgba(cloudy ? deep : C.voidRgb, 1));
+    x.fillStyle = g; x.beginPath(); x.arc(c, c, R, 0, TAU); x.fill();
+    x.save(); x.beginPath(); x.arc(c, c, R, 0, TAU); x.clip();
+    for (let i = 0; i < 230; i++) {
+      const a = rnd(TAU), r0 = R * rnd(0.14, 0.42), r1 = R * rnd(0.5, 0.97), da = rnd(-0.07, 0.07), m = i % 4;
+      x.strokeStyle = m === 0 ? rgba(deep, rnd(0.2, 0.5)) : m === 1 ? rgba(C.eosinRgb, cloudy ? 0.05 : rnd(0.1, 0.34)) : rgba(light, rnd(0.08, 0.34));
+      x.lineWidth = rnd(0.6, 2.2);
+      x.beginPath(); x.moveTo(c + Math.cos(a) * r0, c + Math.sin(a) * r0);
+      x.lineTo(c + Math.cos(a + da) * r1, c + Math.sin(a + da) * r1); x.stroke();
+    }
+    /* the collarette takes the eosin: pink closest to the pupil */
+    g = x.createRadialGradient(c, c, R * 0.22, c, c, R * 0.64);
+    g.addColorStop(0, rgba(C.eosinRgb, cloudy ? 0.12 : 0.6)); g.addColorStop(1, rgba(C.eosinRgb, 0));
+    x.fillStyle = g; x.fillRect(0, 0, S, S);
+    x.restore();
+    x.strokeStyle = rgba(cloudy ? deep : C.voidRgb, 0.75); x.lineWidth = R * 0.07;
+    x.beginPath(); x.arc(c, c, R * 0.965, 0, TAU); x.stroke();
+    return cvs;
+  }
+  function makeSclera(v) {
+    const SW = 132, SH = 190, cvs = mk(SW, SH), x = cvs.getContext('2d');
+    x.save(); x.translate(SW / 2, SH / 2); x.scale(1, SH / SW);
+    const g = x.createRadialGradient(0, -SW * 0.05, SW * 0.1, 0, 0, SW / 2);
+    g.addColorStop(0, C.sclera0); g.addColorStop(0.6, C.sclera0); g.addColorStop(1, C.sclera1);
+    x.fillStyle = g; x.beginPath(); x.arc(0, 0, SW / 2, 0, TAU); x.fill(); x.restore();
+    x.save(); x.beginPath(); x.ellipse(SW / 2, SH / 2, SW / 2, SH / 2, 0, 0, TAU); x.clip();
+    x.strokeStyle = rgba(C.eosinRgb, 1); x.lineCap = 'round'; x.lineJoin = 'round';
+    for (let k = 0; k < 5 + v; k++) {
+      const a = rnd(TAU); let px = SW / 2 + Math.cos(a) * SW / 2, py = SH / 2 + Math.sin(a) * SH / 2;
+      let dir = a + Math.PI + rnd(-0.5, 0.5);
+      x.beginPath(); x.moveTo(px, py);
+      const steps = 5 + ((Math.random() * 6) | 0);
+      for (let s = 0; s < steps; s++) { dir += rnd(-0.6, 0.6); px += Math.cos(dir) * rnd(5, 10); py += Math.sin(dir) * rnd(5, 10); x.lineTo(px, py); }
+      x.lineWidth = rnd(0.6, 1.4); x.globalAlpha = rnd(0.3, 0.75); x.stroke();
+    }
+    x.restore();
+    return cvs;
+  }
+  function makeBlob(rgb, a0) {
+    const S = 128, cvs = mk(S, S), x = cvs.getContext('2d'), g = x.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+    g.addColorStop(0, rgba(rgb, a0)); g.addColorStop(0.45, rgba(rgb, a0 * 0.55)); g.addColorStop(1, rgba(rgb, 0));
+    x.fillStyle = g; x.fillRect(0, 0, S, S); return cvs;
+  }
+  function buildSprites() {
+    SPR.iris = [0, 1, 2, 3, 4].map((v) => makeIris(v, false));
+    SPR.cloud = makeIris(0, true);
+    SPR.sclera = [0, 1, 2, 3].map(makeSclera);
+    SPR.wash = makeBlob(C.eosinRgb, 1);
+    SPR.halo = makeBlob(C.hemaRgb, 1);
+  }
+  function buildTextures() {
+    const n = 128, g = mk(n, n), x = g.getContext('2d'), im = x.createImageData(n, n), c = C.inkRgb, amp = C.glow ? 30 : 24;
+    for (let i = 0; i < n * n; i++) {
+      im.data[i * 4] = c[0]; im.data[i * 4 + 1] = c[1]; im.data[i * 4 + 2] = c[2]; im.data[i * 4 + 3] = Math.random() * amp;
+    }
+    x.putImageData(im, 0, 0); $('grain').style.backgroundImage = `url(${g.toDataURL()})`;
+    /* worn rubber: the stamp never prints whole */
+    const m = mk(160, 160), y = m.getContext('2d'), jm = y.createImageData(160, 160);
+    for (let i = 0; i < 160 * 160; i++) { const r = Math.random(); jm.data[i * 4 + 3] = r < 0.1 ? 40 + Math.random() * 120 : 255 - Math.random() * 50; }
+    y.putImageData(jm, 0, 0);
+    y.globalCompositeOperation = 'destination-out';
+    for (let k = 0; k < 26; k++) { y.globalAlpha = rnd(0.25, 0.7); y.beginPath(); y.ellipse(rnd(160), rnd(160), rnd(2, 9), rnd(1, 4), rnd(TAU), 0, TAU); y.fill(); }
+    const url = `url(${m.toDataURL()})`;
+    stampEl.style.webkitMaskImage = url; stampEl.style.maskImage = url;
+  }
+
+  /* ───────── eyes ───────── */
+  function newEye() {
+    return {
+      lid: 1, empty: false, awake: false, hatch: 0, vacate: false, sleepAt: 0, shut: 0, blink: 0, blinkT: rnd(1.5, 7),
+      gx: 0, gy: 0, sx: 0, sy: 0, nx: 0, ny: 0, saccT: rnd(0.2, 1.2), newborn: 0, stiff: rnd(7, 20),
+      variant: (Math.random() * 20) | 0, pupil: 0.45, lazy: Math.random() < 0.07, cloudy: Math.random() < 0.045,
+    };
+  }
+  /* an O closes over nothing, and opens with something inside */
+  function hatch(g, delay = 0.38) {
+    const e = newEye(); e.lid = 0; e.empty = true; e.hatch = delay; e.cloudy = false; e.lazy = false; g.eye = e;
+  }
+  function stepEye(g, dt) {
+    const e = g.eye, cap = g.s;
+    const cx = g.x + O.cx * cap, cy = g.y + O.cy * cap;
+    const dx = look.x - cx, dy = look.y - cy, d = Math.hypot(dx, dy) || 1;
+    const reach = d / (d + cap * 1.3);
+    let ax = (dx / d) * reach, ay = (dy / d) * reach;
+    if (e.lazy) { ax = 0; ay = 0; }
+    const fr = 1 - look.front; ax *= fr; ay *= fr;
+    e.saccT -= dt;
+    if (e.saccT <= 0) {
+      e.saccT = rnd(0.25, 1.7); e.sx = rnd(-0.05, 0.05); e.sy = rnd(-0.05, 0.05);
+      if (e.newborn > 0) { e.nx = rnd(-0.8, 0.8); e.ny = rnd(-0.8, 0.8); }
+    }
+    if (e.newborn > 0) { e.newborn -= dt; ax = e.nx; ay = e.ny; }
+    const k = 1 - Math.exp(-e.stiff * dt);
+    e.gx += (ax + e.sx - e.gx) * k; e.gy += (ay + e.sy - e.gy) * k;
+
+    if (e.hatch > 0) {
+      e.hatch -= dt;
+      if (e.hatch <= 0) { e.empty = false; e.awake = true; e.newborn = 1.0; e.nx = rnd(-0.7, 0.7); e.ny = rnd(-0.7, 0.7); }
+    }
+    e.blinkT -= dt; if (e.blinkT <= 0) { e.blinkT = rnd(2.4, 8); e.blink = 0.15; }
+    if (e.blink > 0) e.blink -= dt;
+    if (e.shut > 0) e.shut -= dt;
+    const prox = clamp(1 - d / (cap * 2.5 + 140), 0, 1);
+    const asleep = e.sleepAt > 0 && sim.t >= e.sleepAt;
+    const open = e.awake && e.blink <= 0 && e.shut <= 0 && !asleep ? 0.82 + 0.18 * prox : 0;
+    const target = 1 - open;
+    e.lid += (target - e.lid) * (1 - Math.exp(-(target > e.lid ? 34 : 8) * dt));
+    if (e.vacate && e.lid < 0.03) { g.eye = null; return; }
+    /* 瞳孔散大：对着喜欢的东西，它本来就会这样 */
+    const pT = clamp(state.dilate + prox * 0.2 + g.pulse * 0.07 + look.front * 0.12, 0.3, 0.94);
+    e.pupil += (pT - e.pupil) * (1 - Math.exp(-4 * dt));
+  }
+  function lids(lid) {
+    const a = O.a * 1.03, b = O.b * 1.02, cx = O.cx, cy = O.cy;
+    const ru = b * (1 - 1.14 * lid), rl = Math.max(0, b * (1 - 0.86 * lid));
+    ctx.beginPath(); ctx.moveTo(cx - a, cy); ctx.ellipse(cx, cy, a, b, 0, Math.PI, TAU);
+    if (ru >= 0) ctx.ellipse(cx, cy, a, ru, 0, TAU, Math.PI, true); else ctx.ellipse(cx, cy, a, -ru, 0, 0, Math.PI, false);
+    ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx + a, cy); ctx.ellipse(cx, cy, a, b, 0, 0, Math.PI);
+    ctx.ellipse(cx, cy, a, rl, 0, Math.PI, 0, true); ctx.closePath(); ctx.fill();
+  }
+  function drawEye(g, s) {
+    const e = g.eye;
+    if (e.empty) {
+      ctx.fillStyle = C.field; ctx.beginPath(); ctx.ellipse(O.cx, O.cy, O.a * 1.03, O.b * 1.02, 0, 0, TAU); ctx.fill();
+    } else {
+      const sw = O.a * 1.04, sh = O.b * 1.03;
+      ctx.drawImage(SPR.sclera[e.variant % SPR.sclera.length], O.cx - sw, O.cy - sh, sw * 2, sh * 2);
+      if (e.lid < 0.96) {
+        const ix = O.cx + e.gx * O.mx, iy = O.cy + e.gy * O.my, r = O.ri;
+        ctx.drawImage(e.cloudy ? SPR.cloud : SPR.iris[e.variant % SPR.iris.length], ix - r, iy - r, r * 2, r * 2);
+        ctx.fillStyle = e.cloudy ? rgba(C.sclera1Rgb, 0.8) : C.void;
+        ctx.beginPath(); ctx.arc(ix, iy, r * e.pupil, 0, TAU); ctx.fill();
+        if (e.lid < 0.6) {
+          ctx.globalAlpha = 0.92; ctx.fillStyle = C.glint;
+          ctx.beginPath(); ctx.arc(O.cx - 0.075 + e.gx * O.mx * 0.55, O.cy - 0.1 + e.gy * O.my * 0.55, r * 0.17, 0, TAU); ctx.fill();
+          if (s > 70) {
+            ctx.globalAlpha = 0.5;
+            ctx.beginPath(); ctx.arc(O.cx + 0.06 + e.gx * O.mx * 0.55, O.cy + 0.085 + e.gy * O.my * 0.55, r * 0.075, 0, TAU); ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        }
+      }
+    }
+    if (e.lid > 0.012) {
+      ctx.fillStyle = C.ink; lids(e.lid);
+      if (e.lid > 0.8) {
+        ctx.strokeStyle = rgba(C.fieldRgb, ((e.lid - 0.8) / 0.2) * 0.5); ctx.lineWidth = Math.max(0.014, 0.9 / s);
+        ctx.beginPath(); ctx.ellipse(O.cx, O.cy, O.a * 0.92, O.b * 0.14, 0, 0.14, Math.PI - 0.14); ctx.stroke();
+      }
+    }
+  }
+
+  /* ───────── mitosis: O → O-O ───────── */
+  function divide(o) {
+    const i = seq.indexOf(o); if (i < 0) return null;
+    const h = glyph('H'), c = glyph('O');
+    h.x = o.x + ADV.O * o.s; h.y = o.y; h.s = o.s; h.w = 0.02; h.placed = true; h.stitch = sim.t + 0.3;
+    c.x = o.x; c.y = o.y; c.s = o.s; c.placed = true;
+    c.eye = newEye(); c.eye.hatch = 0.5;
+    if (o.eye) o.eye.shut = Math.max(o.eye.shut, 0.42);
+    seq.splice(i + 1, 0, h, c);
+    relayout();
+    o.pulse = Math.max(o.pulse, 0.7); c.pulse = 0.7;
+    const n = countO();
+    if (n <= 6 || (n & (n - 1)) === 0 || n % 48 === 0) log(`mitosis → n = ${n}`);
+    tick(0.035, 1700 + Math.random() * 500);
+    return c;
+  }
+  function roomFor() {
+    const trial = fit(seq.concat([{ type: 'H' }, { type: 'O' }]), stageRect, layout.ceil, false);
+    return trial.cap >= growth.min;
+  }
+  function pickParent() {
+    const os = Os();
+    if (Math.random() < 0.75) {
+      /* 您看哪里，哪里就长 */
+      let best = os[0], bd = Infinity;
+      for (let k = 0; k < 4; k++) {
+        const o = pick(os), d = Math.hypot(o.x + O.cx * o.s - look.x, o.y + O.cy * o.s - look.y);
+        if (d < bd) { bd = d; best = o; }
+      }
+      return best;
+    }
+    return pick(os);
+  }
+  function stepGrowth(dt) {
+    if (!growth.on || growth.full) return;
+    const n = countO();
+    growth.acc += (0.35 + 0.06 * n) * growth.gain * dt;
+    while (growth.acc >= 1) {
+      growth.acc -= 1;
+      if (countO() >= growth.max || !roomFor()) { growth.full = true; growth.acc = 0; log('WARN  n → ∞'); return; }
+      divide(pickParent());
+    }
+  }
+
+  /* ───────── heart: it beats the word, stutter included ───────── */
+  function scheduleWord(t0) {
+    const base = 60 / heart.bpm, ev = [], os = [], f = {};
+    for (const g of seq) { if (g.type === 'O') os.push(g); else if (g.type !== 'H') f[g.type] = g; }
+    let t = t0; const n = os.length;
+    ev.push({ t, kind: 'L', g: f.L });
+    t += 0.8 * base;
+    if (n <= 7) {
+      os.forEach((o, k) => ev.push({ t: t + k * 0.42 * base, kind: k ? 'o' : 'O', g: o }));
+      t += (n - 1) * 0.42 * base + 0.95 * base;
+    } else {
+      const dur = clamp(0.9 + n * 0.012, 1, 2.6) * Math.max(0.5, base), hz = state.stage === 'V' ? 5.2 : 4.2;
+      os.forEach((o, k) => ev.push({ t: t + (dur * k) / n, kind: 'w', g: o }));
+      for (let x = 0; x < dur - 0.05; x += 1 / hz) ev.push({ t: t + x, kind: 'f', g: os[Math.min(n - 1, ((x / dur) * n) | 0)] });
+      heart.runs.push({ t0: t, dur, hz });
+      t += dur + 0.45 * base;
+    }
+    ev.push({ t, kind: 'V', g: f.V }); t += 0.4 * base;
+    ev.push({ t, kind: 'E', g: f.E }); t += state.rest * base;
+    ev.sort((a, b) => a.t - b.t);
+    for (const e of ev) { e.fired = false; heart.beats.push(e); }
+    heart.next = t;
+  }
+  function fireBeat(kind, g) { heart.beats.push({ t: sim.t, kind, g, fired: false }); }
+  function onBeat(b) {
+    if (b.g) b.g.pulse = 1;
+    if (b.kind === 'w') return;
+    const gap = sim.t - heart.lastBeat; heart.lastBeat = sim.t;
+    if (gap > 0.04 && gap < 3) heart.rate += (60 / gap - heart.rate) * (heart.rate < 5 ? 1 : 0.3);
+    beatSound(b);
+  }
+  function stepHeart(dt) {
+    const t = sim.t;
+    heart.bpm += (heart.bpmT - heart.bpm) * (1 - Math.exp(-dt / 6));
+    if (heart.on && t >= heart.next) scheduleWord(Math.max(heart.next, t - 0.05));
+    for (const b of heart.beats) if (!b.fired && b.t <= t) { b.fired = true; onBeat(b); }
+    while (heart.beats.length && heart.beats[0].fired && heart.beats[0].t < t - 1.2) heart.beats.shift();
+    while (heart.runs.length && heart.runs[0].t0 + heart.runs[0].dur < t - 1.2) heart.runs.shift();
+    if (t - heart.lastBeat > 2.8) heart.rate *= Math.exp(-dt * 1.5);
+  }
+  function ecgAt(t) {
+    let v = 0;
+    for (const b of heart.beats) {
+      const d = t - b.t; if (d < -0.3 || d > 0.6) continue;
+      if (b.kind === 'o') v += 1.15 * gauss(d, 0.045, 0.028) - 0.75 * gauss(d, 0.15, 0.05);
+      else if (b.kind !== 'w' && b.kind !== 'f') {
+        v += 0.12 * gauss(d, -0.14, 0.03) - 0.14 * gauss(d, -0.022, 0.008) + gauss(d, 0, 0.011)
+          - 0.22 * gauss(d, 0.026, 0.01) + 0.26 * gauss(d, 0.25, 0.05);
+      }
+    }
+    for (const r of heart.runs) {
+      const u = (t - r.t0) / r.dur; if (u < 0 || u > 1) continue;
+      v += Math.sin((t - r.t0) * TAU * r.hz) * 0.72 * Math.pow(Math.sin(u * Math.PI), 0.35);
+    }
+    return v + (heart.flat ? 0 : (Math.random() - 0.5) * 0.02);
+  }
+  function stepECG(dt) {
+    const n = ecg.buf.length; if (!n) return;
+    const h0 = ecg.head; ecg.head += ecg.speed * dt; ecg.total += ecg.speed * dt;
+    for (let xi = Math.floor(h0) + 1; xi <= Math.floor(ecg.head); xi++) {
+      ecg.buf[xi % n] = ecgAt(sim.t - (ecg.head - xi) / ecg.speed);
+    }
+    if (ecg.head > n * 4096) ecg.head -= n * 4096;
+  }
+
+  /* ───────── threads: 多出来的线，借放在您身上 ───────── */
+  const TH_N = 16;
+  function anchorOf(th) {
+    const g = th.g;
+    if (seq.includes(g)) { th.ax = g.x + O.cx * g.s; th.ay = g.y + (O.cy + O.b * 0.84) * g.s; }
+    return th;
+  }
+  function spawnThread(g) {
+    const th = { g, pts: [], state: 'seek', tip: { x: 0, y: 0 }, len: 2, alpha: 1, age: 0, tension: 0, dir: 0, knot: rnd(TAU), ax: 0, ay: 0, pax: 0, pay: 0 };
+    anchorOf(th); th.pax = th.ax; th.pay = th.ay;
+    for (let i = 0; i < TH_N; i++) th.pts.push({ x: th.ax, y: th.ay, px: th.ax, py: th.ay });
+    th.tip.x = th.ax; th.tip.y = th.ay;
+    g.thread = th; threads.push(th);
+  }
+  function cutThread(th, quiet) {
+    if (th.state === 'cut') return;
+    const was = th.state; th.state = 'cut';
+    const ux = th.ax - th.tip.x, uy = th.ay - th.tip.y, d = Math.hypot(ux, uy) || 1;
+    for (let i = TH_N - 5; i < TH_N; i++) { const p = th.pts[i]; p.px = p.x - (ux / d) * 7; p.py = p.y - (uy / d) * 7; }
+    if (quiet || was !== 'tied') return;
+    state.torn++;
+    if (seq.includes(th.g)) weep(th.g, 2);
+    twang(); log('thread.torn++  // 断口保留'); react('snap');
+  }
+  function stepThreads(dt) {
+    /* new ones go out while there is room */
+    if (state.threadsMax > 0) {
+      threadTimer -= dt;
+      let live = 0; for (const th of threads) if (th.state !== 'cut') live++;
+      if (threadTimer <= 0 && live < state.threadsMax) {
+        threadTimer = state.stage === 'V' ? rnd(0.12, 0.4) : rnd(0.5, 1.4);
+        const os = seq.filter((g) => g.type === 'O' && g.eye && g.eye.awake && !g.thread);
+        let best = null, bs = 0;
+        for (let k = 0; k < 6 && os.length; k++) {
+          const o = pick(os), d = Math.hypot(o.x + O.cx * o.s - look.x, o.y + O.cy * o.s - look.y);
+          const sc = d > 60 ? 1 / (1 + Math.abs(d - 300) / 300) + Math.random() * 0.3 : 0;
+          if (sc > bs) { bs = sc; best = o; }
+        }
+        if (best) { spawnThread(best); if (!sim.ff && Math.random() < 0.5) log('suture(eye → you)'); }
+      }
+    }
+    const G = 900 * dt * dt;
+    for (let ti = threads.length - 1; ti >= 0; ti--) {
+      const th = threads[ti], p = th.pts; anchorOf(th); th.age += dt;
+      const carried = Math.hypot(th.ax - th.pax, th.ay - th.pay) > 0.8; th.pax = th.ax; th.pay = th.ay;
+      const kx = look.x + Math.cos(th.knot) * 6, ky = look.y + Math.sin(th.knot) * 6;
+      if (th.state === 'seek') {
+        const dx = kx - th.tip.x, dy = ky - th.tip.y, d = Math.hypot(dx, dy), sp = (480 + th.age * 1100) * dt;
+        th.dir = Math.atan2(dy, dx);
+        if (d < sp + 4) {
+          th.state = 'tied'; th.tip.x = kx; th.tip.y = ky;
+          th.len = Math.max(Math.hypot(kx - th.ax, ky - th.ay) * 1.22, 90);
+        } else {
+          th.tip.x += (dx / d) * sp; th.tip.y += (dy / d) * sp;
+          th.len = Math.hypot(th.tip.x - th.ax, th.tip.y - th.ay) * 1.06 + 2;
+        }
+      } else if (th.state === 'tied') {
+        th.tip.x = kx; th.tip.y = ky;
+        const d = Math.hypot(kx - th.ax, ky - th.ay), want = Math.max(d * (state.tighten ? 1.08 : 1.22), 70);
+        /* 靠近可以。线只收，不放。 */
+        if (th.len > want) th.len = Math.max(want, th.len - 150 * dt);
+        /* an imagined you cannot tear it */
+        if (!look.real || sim.ff || look.grace > 0 || carried) th.len = Math.max(th.len, d / 1.2);
+        th.tension = d / th.len;
+        if (th.tension > 1.3) cutThread(th);
+      } else {
+        th.alpha -= dt / 2.4;
+        if (th.alpha <= 0) { if (th.g.thread === th) th.g.thread = null; threads.splice(ti, 1); continue; }
+      }
+      const pinned = th.state !== 'cut', last = TH_N - 1, seg = th.len / last;
+      for (let i = 1; i < (pinned ? last : TH_N); i++) {
+        const q = p[i], vx = (q.x - q.px) * 0.985, vy = (q.y - q.py) * 0.985 + G;
+        q.px = q.x; q.py = q.y; q.x += vx; q.y += vy;
+      }
+      for (let it = 0; it < 5; it++) {
+        p[0].x = th.ax; p[0].y = th.ay; if (pinned) { p[last].x = th.tip.x; p[last].y = th.tip.y; }
+        for (let i = 0; i < last; i++) {
+          const a = p[i], b = p[i + 1], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+          if (d <= seg || d < 1e-6) continue;
+          const m = (d - seg) / d, aPin = i === 0, bPin = pinned && i + 1 === last;
+          if (aPin && bPin) continue;
+          if (aPin) { b.x -= dx * m; b.y -= dy * m; }
+          else if (bPin) { a.x += dx * m; a.y += dy * m; }
+          else { a.x += dx * m * 0.5; a.y += dy * m * 0.5; b.x -= dx * m * 0.5; b.y -= dy * m * 0.5; }
+        }
+      }
+    }
+  }
+
+  /* ───────── stain: what runs, and what is left of where you have been ───────── */
+  function weep(g, n = 1) {
+    for (let i = 0; i < n; i++) {
+      drips.push({ x: g.x + (O.cx + rnd(-0.1, 0.1)) * g.s, y: g.y + (O.cy + O.b * 0.9) * g.s, vy: rnd(50, 110),
+        w: clamp(g.s * 0.02, 1.1, 3.2), len: rnd(50, 240), run: 0, ph: rnd(TAU) });
+    }
+  }
+  function stepStain(dt) {
+    if (drips.length) {
+      stain.ink = sim.t;
+      sctx.lineCap = 'round'; sctx.strokeStyle = C.eosin; sctx.fillStyle = C.eosin;
+      for (let i = drips.length - 1; i >= 0; i--) {
+        const d = drips[i], x0 = d.x, y0 = d.y;
+        d.vy = Math.max(6, d.vy * (1 - 0.55 * dt)); d.y += d.vy * dt; d.run += d.vy * dt;
+        d.x += Math.sin(d.y * 0.05 + d.ph) * 0.06;
+        sctx.globalAlpha = 0.5; sctx.lineWidth = d.w * (0.6 + 0.4 * Math.min(1, d.run / 30));
+        sctx.beginPath(); sctx.moveTo(x0, y0); sctx.lineTo(d.x, d.y); sctx.stroke();
+        if (d.run > d.len || d.y > H + 4) {
+          sctx.globalAlpha = 0.6; sctx.beginPath(); sctx.arc(d.x, d.y, d.w * 1.15, 0, TAU); sctx.fill();
+          drips.splice(i, 1);
+        }
+      }
+      sctx.globalAlpha = 1;
+    }
+    /* 您经过的地方，我都留着 */
+    if (state.trail && look.real && ptr.inside && !sim.ff) {
+      const mv = Math.hypot(ptr.x - ptr.px, ptr.y - ptr.py);
+      if (mv > 1.5 && mv < 400) {
+        stain.ink = sim.t;
+        sctx.globalAlpha = 0.2; sctx.strokeStyle = C.ink; sctx.lineWidth = 0.8;
+        sctx.beginPath(); sctx.moveTo(ptr.px, ptr.py); sctx.lineTo(ptr.x, ptr.y); sctx.stroke(); sctx.globalAlpha = 1;
+      }
+    }
+    ptr.px = ptr.x; ptr.py = ptr.y;
+    /* fading never reaches zero in 8 bits. a residue stays. */
+    stain.fade += dt;
+    if (stain.fade > 0.3 && sim.t - stain.ink < 90) {
+      stain.fade = 0;
+      sctx.globalCompositeOperation = 'destination-out'; sctx.fillStyle = 'rgba(0,0,0,0.028)';
+      sctx.fillRect(0, 0, stainCv.width, stainCv.height); sctx.globalCompositeOperation = 'source-over';
+    }
+  }
+  function bleachStain(a) {
+    sctx.globalCompositeOperation = 'destination-out'; sctx.fillStyle = `rgba(0,0,0,${a})`;
+    sctx.fillRect(0, 0, stainCv.width, stainCv.height); sctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ───────── where you are ───────── */
+  function stepLook(dt) {
+    const t = sim.t; let tx, ty;
+    const real = ptr.has && !sim.ff && (ptr.inside || t - ptr.exitT < 7);
+    if (real) { tx = ptr.x; ty = ptr.y; }
+    else {
+      /* 您不在，我就自己想象您 */
+      tx = stageRect.x + stageRect.w / 2 + Math.sin(t * 0.23 + 1.3) * stageRect.w * 0.44;
+      ty = stageRect.y + stageRect.h / 2 + Math.sin(t * 0.31) * stageRect.h * 0.5 + Math.sin(t * 0.11) * 30;
+    }
+    if (real && !look.real) look.grace = 0.6;
+    if (look.grace > 0) look.grace -= dt;
+    look.real = real;
+    const k = 1 - Math.exp(-(real ? 30 : 3) * dt);
+    look.x += (tx - look.x) * k; look.y += (ty - look.y) * k;
+    const idle = real && ptr.inside && ptr.type !== 'touch' && t - ptr.lastMove > 6.5;
+    const f = Math.max(look.force, idle ? 1 : 0);
+    look.front += (f - look.front) * (1 - Math.exp(-(f > look.front ? 1.6 : 8) * dt));
+    if (idle && !look.idleSaid) { look.idleSaid = true; react('idle'); }
+    if (!idle) look.idleSaid = false;
+  }
+
+  /* ───────── voice ───────── */
+  const voice = { q: [], cur: null, el: $('voice'), span: $('voice').firstElementChild, sr: $('voice-sr'), shown: '', op: -1 };
+  function say(text, opt = {}) {
+    const chars = [...text], times = []; let t = 0;
+    for (const ch of chars) {
+      times.push(t);
+      t += /[，、]/.test(ch) ? 0.26 : /[。？！—]/.test(ch) ? 0.36 : ch === '…' ? 0.3 : ch === ' ' ? 0.02 : 0.085;
+    }
+    const item = { text, chars, times, dur: t, hold: opt.hold ?? 1.25 + chars.length * 0.055, t0: 0, done: false, aside: !!opt.aside, spoken: false };
+    if (opt.aside) {
+      /* a reaction cuts in. whatever it was saying, it starts over afterwards. */
+      const c = voice.cur;
+      if (c && !c.aside) { if (!c.done) { c.spoken = false; voice.q.unshift(c); } voice.cur = null; }
+      voice.q.unshift(item);
+    } else voice.q.push(item);
+    return () => item.done;
+  }
+  function stepVoice() {
+    if (!voice.cur && voice.q.length) { voice.cur = voice.q.shift(); voice.cur.t0 = sim.t + 0.15; }
+    const c = voice.cur; if (!c) return;
+    const el = sim.t - c.t0;
+    if (el > c.dur + c.hold) c.done = true;
+    if (el > c.dur + c.hold + 0.55) voice.cur = null;
+  }
+  function drawVoice() {
+    const c = voice.cur; let txt = '', op = 0, typing = false;
+    if (c) {
+      const el = sim.t - c.t0; let n = 0;
+      while (n < c.times.length && c.times[n] <= el) n++;
+      txt = c.chars.slice(0, n).join(''); typing = n < c.chars.length;
+      op = el > c.dur + c.hold ? Math.max(0, 1 - (el - c.dur - c.hold) / 0.5) : 1;
+      if (!c.spoken && el > 0) { c.spoken = true; voice.sr.textContent = c.text; }
+    }
+    if (txt !== voice.shown) { voice.span.textContent = txt; voice.shown = txt; voice.el.classList.toggle('typing', typing); }
+    else if (!typing) voice.el.classList.remove('typing');
+    if (op !== voice.op) { voice.el.style.opacity = op; voice.op = op; }
+  }
+  const LINES = {
+    snap: ['断了一根。', '没关系。我还有。', '是您扯断的，所以断口我留着。', '请再扯一次。……失礼了。当我没说。'],
+    poke: ['啊。', '……没事。您可以碰。', '它闭上了。它记住您了。', '它说，谢谢。'],
+    leave: ['……您去哪儿。', '我在原地。我只会在原地。', '是从那里出去的吗。我看着那里。'],
+    idle: ['您不动的时候，我看的是您本人。', '就这样。这样很好。', '请不要眨眼。……玩笑。'],
+    back: [(s) => `您离开了${spanText(s)}。我数了。`],
+  };
+  const COOL = { snap: 7, poke: 5, leave: 18, idle: 30, back: 0 };
+  const reacted = { last: {}, idx: {} };
+  function react(kind, arg) {
+    if (sim.ff || state.curing || state.stage === 'I') return;
+    if (sim.t - (reacted.last[kind] ?? -99) < COOL[kind]) return;
+    if (voice.q.some((i) => i.aside)) return;
+    reacted.last[kind] = sim.t;
+    const list = LINES[kind], i = (reacted.idx[kind] = ((reacted.idx[kind] ?? -1) + 1) % list.length);
+    say(typeof list[i] === 'function' ? list[i](arg) : list[i], { aside: true, hold: 1.7 });
+  }
+
+  /* ───────── log ───────── */
+  const logEl = $('log'), logLines = [];
+  function log(msg) {
+    if (sim.ff) return;
+    logLines.push(`${clock(state.watch)}  ${msg}`); if (logLines.length > 4) logLines.shift();
+    logEl.textContent = '';
+    for (const l of logLines) { const li = document.createElement('li'); li.textContent = l; logEl.appendChild(li); }
+  }
+
+  /* ───────── sound: off until asked ───────── */
+  const snd = { ctx: null, on: false, out: null, tone: null };
+  function sndInit() {
+    if (snd.ctx) return true;
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return false;
+    try {
+      snd.ctx = new AC(); snd.out = snd.ctx.createGain(); snd.out.gain.value = 0.75;
+      const comp = snd.ctx.createDynamicsCompressor(); snd.out.connect(comp); comp.connect(snd.ctx.destination);
+      return true;
+    } catch (e) { return false; }
+  }
+  function thump(f0, f1, dur, vol, pan) {
+    if (!snd.on || sim.ff) return;
+    const a = snd.ctx, t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.8);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.006); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); let node = g;
+    if (a.createStereoPanner && pan) { const p = a.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); node = p; }
+    node.connect(snd.out); o.start(t); o.stop(t + dur + 0.03);
+  }
+  function tick(vol = 0.05, freq = 2200) {
+    if (!snd.on || sim.ff) return;
+    const a = snd.ctx, t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(freq, t); o.frequency.exponentialRampToValueAtTime(freq * 0.6, t + 0.04);
+    g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    o.connect(g); g.connect(snd.out); o.start(t); o.stop(t + 0.06);
+  }
+  function twang() {
+    if (!snd.on || sim.ff) return;
+    const a = snd.ctx, t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = 'triangle'; o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(300, t + 0.14);
+    g.gain.setValueAtTime(0.13, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    o.connect(g); g.connect(snd.out); o.start(t); o.stop(t + 0.2);
+  }
+  function toneOn() {
+    if (!snd.on || snd.tone) return;
+    const a = snd.ctx, t = a.currentTime, o = a.createOscillator(), g = a.createGain();
+    o.type = 'sine'; o.frequency.value = 880; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.035, t + 0.5);
+    o.connect(g); g.connect(snd.out); o.start(t); snd.tone = { o, g };
+  }
+  function toneOff() {
+    if (!snd.tone) return;
+    const { o, g } = snd.tone, t = snd.ctx.currentTime; snd.tone = null;
+    g.gain.cancelScheduledValues(t); g.gain.setValueAtTime(Math.max(0.0001, g.gain.value), t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.4);
+    o.stop(t + 0.45);
+  }
+  function beatSound(b) {
+    if (!snd.on || sim.ff) return;
+    const pan = b.g ? (((b.g.x + b.g.s * 0.5) / W) * 2 - 1) * 0.7 : 0;
+    if (b.kind === 'L') thump(150, 42, 0.26, 0.9, pan);
+    else if (b.kind === 'O') thump(170, 52, 0.2, 0.7, pan);
+    else if (b.kind === 'o') thump(210, 62, 0.15, 0.5, pan);
+    else if (b.kind === 'V') thump(140, 40, 0.24, 0.8, pan);
+    else if (b.kind === 'E') thump(180, 50, 0.16, 0.5, pan);
+    else if (b.kind === 'f') thump(200, 64, 0.1, 0.26, pan);
+  }
+
+  /* ───────── the course of the illness ───────── */
+  const ORDER = ['I', 'II', 'III', 'IV', 'V', 'VI'];
+  const STAGES = {
+    I: ['潜伏期', 'INCUBATION'], II: ['前驱期', 'PRODROME'], III: ['发作期', 'ACUTE'],
+    IV: ['慢性期', 'CHRONIC'], V: ['终末期', 'TERMINAL'], VI: ['复发', 'RELAPSE'],
+  };
+  const TUNE = {
+    I: { bpm: 54, rest: 1.3, dilate: 0.4 }, II: { bpm: 58, rest: 1.3, dilate: 0.44 }, III: { bpm: 88, rest: 1.0, dilate: 0.52 },
+    IV: { bpm: 98, rest: 0.9, dilate: 0.6 }, V: { bpm: 150, rest: 0.3, dilate: 0.86 }, VI: { bpm: 56, rest: 1.3, dilate: 0.5 },
+  };
+  function setStage(k) {
+    state.stage = k; state.stageT0 = sim.t;
+    heart.bpmT = TUNE[k].bpm; state.rest = TUNE[k].rest; state.dilate = TUNE[k].dilate;
+    if (k === 'II') { growth.on = false; growth.full = false; growth.acc = 0; state.threadsMax = 0; state.tighten = false; state.trail = false; }
+    syncStage();
+  }
+  function syncStage() {
+    if (sim.ff) return;
+    const i = ORDER.indexOf(state.stage);
+    [...$('course').children].forEach((li, k) => { li.className = k === i ? 'now' : k < i ? 'past' : ''; });
+    const s = state.sterile ? ['痊愈', 'CURED'] : STAGES[state.stage];
+    $('c-stage').innerHTML = `${s[0]} <span class="en">${s[1]}</span>`;
+    plate.classList.toggle('cured', state.sterile);
+  }
+  const sew = (h) => { h.stitch = sim.t; tick(0.04, 2600); };
+
+  function* utter() {
+    const [L, O1, H1, O2, H2, O3, V, E] = seq;
+    fireBeat('L', L); log('say("L")'); yield 0.95;
+    fireBeat('O', O1); log('say("O")'); yield 0.6;
+    sew(H1); yield 0.3; fireBeat('o', O2); log('retry → "O"'); yield 0.56;
+    sew(H2); yield 0.3; fireBeat('o', O3); log('retry → "O"'); yield 1.3;
+    fireBeat('V', V); yield 0.42; fireBeat('E', E); log('say("VE")');
+  }
+  function* openEyes() {
+    let k = 0;
+    for (const g of Os()) { if (!g.eye) { hatch(g); log(`eye[${k}].open()`); yield 0.5; } k++; }
+  }
+  function* cure() {
+    state.curing = true; growth.on = false; state.threadsMax = 0; state.tighten = false; state.trail = false;
+    heart.on = false; heart.beats = heart.beats.filter((b) => b.fired);
+    for (const r of heart.runs) r.dur = Math.min(r.dur, Math.max(0.01, sim.t - r.t0));
+    look.force = 1;
+    yield 1.4;
+    const os = Os(), span = Math.min(1.3, 0.3 + os.length * 0.012);
+    os.forEach((o, i) => { if (o.eye) o.eye.sleepAt = sim.t + (span * i) / os.length; });
+    yield span + 0.55;
+    for (const th of threads) cutThread(th, true);
+    /* 把它完整地说出来 */
+    const keep = os[0], rest = seq.filter((g) => g.type === 'H' || (g.type === 'O' && g !== keep));
+    const word = seq.filter((g) => g.type !== 'H' && (g.type !== 'O' || g === keep));
+    state.cured = true; state.collapsing = true;
+    applyLayout(fit(word, stageRect, layout.titleCap, true), true);
+    for (const g of rest) { g.tx = keep.tx + (g.type === 'H' ? ADV.O * 0.5 * layout.cap : 0); g.ty = keep.ty; g.ts = layout.cap; if (g.type === 'H') g.tw = 0.02; }
+    yield 1.05;
+    seq = word; state.collapsing = false; relayout();
+    if (keep.eye) { const e = keep.eye; e.empty = true; e.awake = true; e.vacate = true; e.sleepAt = 0; e.shut = 0; e.blink = 0; e.blinkT = 99; }
+    bleachStain(0.85);
+    yield 0.8;
+    for (const g of seq) { fireBeat(g.type, g); yield 0.36; }
+    log('say("LOVE") → ok');
+    yield 0.5;
+    heart.flat = true; state.sterile = true; toneOn(); syncStage();
+    log('symptom = null');
+    yield 1.6; log('patient = null');
+    yield 1.6; stampOn();
+    yield 5.6;
+  }
+  function* relapse(cycle) {
+    yield 0.4; log('residue detected');
+    heart.flat = false; state.sterile = false; toneOff(); syncStage();
+    const o = Os()[0]; hatch(o, 0.5);
+    yield 1.5; fireBeat('O', o); stampRun();
+    yield say('……', { hold: 0.9 });
+    if (cycle === 1) {
+      yield say('好了以后，就没有什么可以看着您了。');
+      yield say('所以，请原谅。');
+      yield say('我把它咽回去了。');
+    } else if (cycle === 2) {
+      yield say('还是不行。');
+      yield say('请允许我，一直好不了。');
+    } else {
+      yield say('请允许我，一直好不了。');
+    }
+    state.cured = false;
+    log(`relapse(#${cycle + 1})`);
+    fireBeat('o', divide(o)); yield 0.62;
+    fireBeat('o', divide(o)); yield 1.0;
+    state.curing = false; look.force = 0;
+    heart.on = true; heart.next = sim.t + 0.5;
+    yield say(cycle === 1 ? '病着，才是我。' : '这样就好。');
+    yield 1.0;
+  }
+  function* score() {
+    let cycle = 1;
+    setStage('I');
+    yield 1.2;
+    log('observe(you)');
+    if (memory.visits > 1) {
+      yield say(`您又来了。这是第${cn(memory.visits)}次。`);
+      if (memory.gap > 5) yield say(`距上一次，已经${spanText(memory.gap)}。我数着。`);
+    }
+    yield say('有一个词，想说给您听。', { hold: 0.9 });
+    yield 0.2;
+    yield* utter();
+    yield 0.7;
+    yield say('失礼了。它总是卡在这里。', { hold: 1.0 });
+    heart.on = true; heart.next = sim.t + 0.4;
+    for (;;) {
+      /* Ⅱ 前驱期：说不出口的，变成看 */
+      setStage('II');
+      if (cycle === 1) { say('说不出口的，就只好用看。'); yield 1.7; }
+      else if (cycle === 2) yield say('您还在。');
+      else yield say(`第${cn(cycle)}次了。`);
+      yield* openEyes();
+      yield 1.2;
+      if (cycle === 1) {
+        yield say('您好。');
+        yield say('请不必理会我。我只是看着。');
+        yield 1.0;
+        yield say('我很克制。您看，我连一个词都没有说完。');
+      } else if (cycle === 2) {
+        yield say('我就知道。');
+      } else {
+        yield say('您是不是也有一点——');
+        yield say('失礼了。当我没说。');
+      }
+      yield 1.2;
+
+      /* Ⅲ 发作期：每卡住一次，多一个 O */
+      setStage('III'); growth.on = true; growth.gain = 1;
+      if (cycle === 1) {
+        yield say('每卡住一次，就多一个 O。');
+        yield say('每多一个 O，就多一只眼睛。');
+        yield 3.5;
+        yield say('我没有想要这么多的。');
+        yield say('只是想多看您一眼。');
+        yield say('然后，再一眼。');
+        yield 4;
+        yield say('请放心。它们都很有礼貌。');
+        yield say('它们从不在同一刻眨眼。总有一只，是醒着的。');
+      } else {
+        yield say('又开始了。');
+        yield 4;
+        yield say('这一次，我会长得整齐一些。');
+        yield 6;
+        yield say('……并没有。失礼了。');
+      }
+      { const goal = Math.round(growth.max * 0.45); yield () => countO() >= goal || growth.full || sim.t - state.stageT0 > 42; }
+
+      /* Ⅳ 慢性期：缝 */
+      setStage('IV'); growth.gain = 0.15;
+      if (cycle === 1) {
+        yield say('连字符是缝线。您注意到了吗。');
+        yield say('我是缝起来的。缝得不太好。');
+        yield say('多出来的线，可以借放在您身上吗。');
+        state.threadsMax = 3; yield 3;
+        yield say('不疼的。只是系着。');
+        state.threadsMax = 6; yield 2;
+        yield say('这样，您走远一点，我就会知道。');
+        state.trail = true; yield 5;
+        state.threadsMax = W < 720 ? 6 : 9;
+        yield say('您经过的地方，我都留着。');
+        yield 7;
+      } else {
+        yield say('线，我重新穿好了。');
+        state.threadsMax = 5; state.trail = true; yield 4;
+        yield say('还是借放在您身上。');
+        state.threadsMax = W < 720 ? 6 : 9; yield 10;
+      }
+
+      /* Ⅴ 终末期 */
+      setStage('V'); growth.gain = 2.4; state.tighten = true; state.threadsMax = W < 720 ? 10 : 20;
+      yield 3.5;
+      if (cycle === 1) {
+        yield say('医生说，这不是那个词。');
+        yield say('医生说，把它完整地说出来，就会好。');
+        yield 1;
+        yield say('我练习了很久。');
+      } else {
+        yield say('医生说，上一次我其实已经好了。');
+        yield say('医生不明白。');
+      }
+      yield 1.5;
+      yield say(cycle === 1 ? '请听。' : '请再听一次。');
+      yield* cure();
+
+      /* Ⅵ 复发：痊愈后无应答，所以不痊愈 */
+      setStage('VI');
+      yield* relapse(cycle);
+      cycle++; state.cycle = cycle;
+    }
+  }
+  const co = { gen: null, wait: 0, cond: null };
+  function runScore(dt) {
+    if (co.wait > 0) { co.wait -= dt; if (co.wait > 0) return; }
+    if (co.cond) { if (!co.cond()) return; co.cond = null; }
+    for (let guard = 0; guard < 60; guard++) {
+      const r = co.gen.next(); if (r.done) return;
+      const v = r.value;
+      if (typeof v === 'number') { co.wait = v; return; }
+      if (typeof v === 'function' && !v()) { co.cond = v; return; }
+    }
+  }
+
+  /* ───────── the stamp ───────── */
+  function stampOn() {
+    if (sim.ff) return;
+    const b = layout.block;
+    stampEl.style.left = b.x + b.w * 0.72 + 'px'; stampEl.style.top = b.y + b.h * 0.96 + 'px';
+    stampEl.style.fontSize = Math.max(26, layout.cap * 0.36) + 'px';
+    stampEl.classList.remove('run'); stampEl.classList.add('on');
+    thump(120, 46, 0.2, 0.9, 0.2); tick(0.08, 900);
+  }
+  function stampRun() {
+    if (sim.ff || !stampEl.classList.contains('on')) { stampEl.classList.remove('on', 'run'); return; }
+    const pr = plate.getBoundingClientRect(), r = stampEl.getBoundingClientRect();
+    for (let i = 0; i < 7; i++) {
+      drips.push({ x: r.left - pr.left + r.width * rnd(0.08, 0.92), y: r.top - pr.top + r.height * rnd(0.55, 0.95), vy: rnd(30, 80),
+        w: rnd(1.4, 3), len: rnd(60, 260), run: 0, ph: rnd(TAU) });
+    }
+    stampEl.classList.add('run');
+    setTimeout(() => stampEl.classList.remove('on', 'run'), 3000);
+  }
+
+  /* ───────── one step of the simulation ───────── */
+  const DT = 1 / 60;
+  function stepGlyphs(dt) {
+    const k = 64, c = 13.5;
+    for (let i = 0; i < seq.length; i++) {
+      const g = seq[i];
+      if (!g.placed) { g.x = g.tx; g.y = g.ty; g.s = g.ts; g.w = g.tw; g.placed = true; }
+      g.vx += (k * (g.tx - g.x) - c * g.vx) * dt; g.x += g.vx * dt;
+      g.vy += (k * (g.ty - g.y) - c * g.vy) * dt; g.y += g.vy * dt;
+      g.vs += (k * (g.ts - g.s) - c * g.vs) * dt; g.s = Math.max(1, g.s + g.vs * dt);
+      g.vw += (k * (g.tw - g.w) - c * g.vw) * dt; g.w = Math.max(0, g.w + g.vw * dt);
+      g.pulse *= Math.exp(-dt / 0.2);
+      if (g.eye) stepEye(g, dt);
+      if (g.divideAt && sim.t >= g.divideAt) {
+        g.divideAt = 0;
+        if (growth.on && !growth.full && countO() < growth.max && roomFor()) divide(g);
+      }
+    }
+  }
+  function step(dt) {
+    sim.t += dt;
+    if (!sim.ff) state.watch += dt;
+    runScore(dt);
+    stepLook(dt);
+    stepGrowth(dt);
+    stepHeart(dt);
+    stepGlyphs(dt);
+    stepThreads(dt);
+    stepStain(dt);
+    stepECG(dt);
+    stepVoice();
+  }
+
+  /* ───────── drawing ───────── */
+  function place(g, ox = 0, oy = 0) {
+    const amp = RM ? 0.012 : g.type === 'O' ? 0.05 : 0.038, s = g.s * (1 + g.pulse * amp);
+    const mx = g.type === 'H' ? g.w / 2 : MIDX[g.type];
+    ctx.setTransform(DPR * s, 0, 0, DPR * s, DPR * (g.x + mx * (g.s - s) + ox), DPR * (g.y + 0.5 * (g.s - s) + oy));
+    return s;
+  }
+  function drawECG() {
+    const n = ecg.buf.length; if (!n) return;
+    const x = ecgRect.x, mid = ecgRect.y + ecgRect.h * 0.62, amp = ecgRect.h * 0.5, head = Math.floor(ecg.head) % n, gap = 22;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = C.eosin; ctx.lineWidth = 1.15;
+    ctx.globalAlpha = 0.5; ctx.beginPath(); let pen = false;
+    for (let i = 0; i < n; i++) {
+      const ahead = (i - head + n) % n;
+      if (ahead > 0 && ahead < gap) { pen = false; continue; }
+      const y = mid - ecg.buf[i] * amp;
+      if (pen) ctx.lineTo(x + i, y); else { ctx.moveTo(x + i, y); pen = true; }
+    }
+    ctx.stroke();
+    ctx.globalAlpha = 1; ctx.beginPath(); pen = false;
+    for (let k = Math.min(150, n - gap - 1, Math.floor(ecg.total)); k >= 0; k--) {
+      const i = (head - k + n) % n, y = mid - ecg.buf[i] * amp;
+      if (pen && i !== 0) ctx.lineTo(x + i, y); else { ctx.moveTo(x + i, y); pen = true; }
+    }
+    if (C.glow) { ctx.globalAlpha = 0.25; ctx.lineWidth = 4; ctx.stroke(); ctx.globalAlpha = 1; ctx.lineWidth = 1.15; }
+    ctx.stroke();
+    ctx.fillStyle = C.eosin; ctx.beginPath(); ctx.arc(x + head, mid - ecg.buf[head] * amp, 1.8, 0, TAU); ctx.fill();
+  }
+  function drawThreads() {
+    if (!threads.length) return;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    for (const th of threads) {
+      const p = th.pts, a = clamp(th.alpha, 0, 1) * 0.92, last = p.length - 1;
+      ctx.beginPath(); ctx.moveTo(p[0].x, p[0].y);
+      for (let i = 1; i < last; i++) ctx.quadraticCurveTo(p[i].x, p[i].y, (p[i].x + p[i + 1].x) / 2, (p[i].y + p[i + 1].y) / 2);
+      ctx.lineTo(p[last].x, p[last].y);
+      ctx.strokeStyle = C.eosin;
+      if (C.glow) { ctx.globalAlpha = a * 0.22; ctx.lineWidth = 4; ctx.stroke(); }
+      ctx.globalAlpha = a; ctx.lineWidth = th.tension > 1 ? 0.9 : 1.15; ctx.stroke();
+      if (th.state === 'seek') {
+        /* the needle */
+        const c = Math.cos(th.dir), s = Math.sin(th.dir);
+        ctx.strokeStyle = C.ink; ctx.lineWidth = 1.4; ctx.beginPath();
+        ctx.moveTo(th.tip.x, th.tip.y); ctx.lineTo(th.tip.x + c * 17, th.tip.y + s * 17); ctx.stroke();
+      } else if (th.state === 'tied') {
+        ctx.fillStyle = C.eosin; ctx.beginPath(); ctx.arc(th.tip.x, th.tip.y, 1.7, 0, TAU); ctx.fill();
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function render() {
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.fillStyle = C.field; ctx.fillRect(0, 0, W, H);
+    if (sim.t - stain.ink < 90) { ctx.globalAlpha = 0.92; ctx.drawImage(stainCv, 0, 0, W, H); ctx.globalAlpha = 1; }
+
+    /* cytoplasm: eosin, soft, under every open cell */
+    if (C.glow) ctx.globalCompositeOperation = 'lighter';
+    for (const g of seq) {
+      if (g.type !== 'O' || !g.eye || g.eye.empty) continue;
+      const R = g.s * 0.95;
+      ctx.globalAlpha = (C.glow ? 0.2 : 0.3) * (1 - g.eye.lid * 0.7) * (0.8 + 0.2 * g.pulse);
+      ctx.drawImage(SPR.wash, g.x + O.cx * g.s - R, g.y + O.cy * g.s - R, R * 2, R * 2);
+    }
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+
+    drawECG();
+
+    /* chromatic fringe: the two stains part a little on every beat */
+    if (!state.sterile) {
+      for (const g of seq) {
+        if (g.type === 'H') continue;
+        const f = (0.0035 + 0.011 * g.pulse) * g.s * (RM ? 0.4 : 1);
+        if (f < 0.3) continue;
+        const t = hair(place(g, f, f * 0.4));
+        ctx.fillStyle = C.eosin; if (g.type === 'O') ring(); else LETTER[g.type](t);
+        place(g, -f, -f * 0.4);
+        ctx.fillStyle = C.hema; if (g.type === 'O') ring(); else LETTER[g.type](t);
+      }
+    }
+
+    for (const g of seq) {
+      const s = place(g), t = hair(s);
+      if (g.type === 'O') { if (g.eye) drawEye(g, s); ctx.fillStyle = C.ink; ring(); }
+      else if (g.type === 'H') { ctx.fillStyle = C.ink; ctx.fillRect(0.05, 0.5 - t / 2, Math.max(0, g.w - 0.1), t); }
+      else { ctx.fillStyle = C.ink; LETTER[g.type](t); }
+    }
+
+    /* sutures */
+    ctx.strokeStyle = C.eosin; ctx.lineCap = 'round';
+    for (const g of seq) {
+      if (g.type !== 'H' || g.stitch < 0) continue;
+      const age = sim.t - g.stitch, span = g.w - 0.12; if (age <= 0 || span <= 0.03) continue;
+      const s = place(g), n = Math.max(2, Math.round(span / 0.115));
+      ctx.lineWidth = Math.max(0.016, 1.25 / s); ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const p = clamp((age - i * 0.09) / 0.12, 0, 1); if (p <= 0) break;
+        const x = 0.06 + (span * (i + 0.5)) / n;
+        ctx.moveTo(x + 0.032, 0.5 - 0.09); ctx.lineTo(x + 0.032 - 0.064 * p, 0.5 - 0.09 + 0.18 * p);
+      }
+      ctx.stroke();
+    }
+
+    /* fluorescence: only with the lights off */
+    if (C.glow) {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.globalCompositeOperation = 'lighter';
+      for (const g of seq) {
+        if (g.type !== 'O' || !g.eye || g.eye.empty || g.eye.lid > 0.9) continue;
+        const e = g.eye, R = g.s * 0.72;
+        ctx.globalAlpha = 0.5 * (1 - e.lid) * (0.6 + 0.4 * g.pulse);
+        ctx.drawImage(SPR.halo, g.x + (O.cx + e.gx * O.mx) * g.s - R, g.y + (O.cy + e.gy * O.my) * g.s - R, R * 2, R * 2);
+      }
+      ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    }
+
+    drawThreads();
+
+    /* 您 */
+    if (ptr.has && ptr.inside && ptr.type !== 'touch') {
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.strokeStyle = C.ink; ctx.fillStyle = C.ink; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(ptr.x, ptr.y, 6.5, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.arc(ptr.x, ptr.y, 1.2, 0, TAU); ctx.fill();
+    }
+  }
+
+  /* ───────── captions ───────── */
+  const cache = {};
+  function put(id, txt) { if (cache[id] !== txt) { cache[id] = txt; $(id).textContent = txt; } }
+  let hudLast = 0;
+  function syncHUD(now, force) {
+    if (!force && now - hudLast < 120) return; hudLast = now;
+    put('c-n', pad(countO(), 3));
+    put('c-hr', heart.flat ? '000' : heart.rate < 20 ? '---' : pad(Math.min(heart.rate, 300), 3));
+    put('c-fix', clock(state.watch));
+    put('c-torn', pad(state.torn, 2));
+    const mag = (layout.cap / layout.titleCap) * 40;
+    put('c-mag', '×' + (mag >= 10 ? Math.round(mag) : mag.toFixed(1)));
+    const pxPerUm = layout.cap / 10; let um = 100;
+    for (const c of [1, 2, 5, 10, 20, 50, 100]) if (c * pxPerUm >= 44) { um = c; break; }
+    const bw = Math.round(um * pxPerUm) + 'px';
+    if (cache.bar !== bw) { cache.bar = bw; $('scale-bar').style.width = bw; }
+    put('scale-txt', um + ' µm');
+  }
+
+  /* ───────── size, theme ───────── */
+  function resize() {
+    const r = plate.getBoundingClientRect();
+    W = Math.max(240, r.width); H = Math.max(240, r.height);
+    DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1, Math.sqrt(7e6 / (W * H))));
+    cv.width = Math.round(W * DPR); cv.height = Math.round(H * DPR);
+    stainCv.width = Math.round(W); stainCv.height = Math.round(H);
+    const hud = $('hud').getBoundingClientRect(), top = $('hud-top').getBoundingClientRect(), bot = $('hud-bottom').getBoundingClientRect(), eg = $('ecg').getBoundingClientRect();
+    const inset = W < 720 ? 0 : Math.min(72, W * 0.04);
+    stageRect.x = hud.left - r.left + inset; stageRect.w = Math.max(120, hud.width - inset * 2);
+    stageRect.y = top.bottom - r.top + (W < 720 ? 14 : 20);
+    stageRect.h = Math.max(70, bot.top - r.top - 8 - stageRect.y);
+    ecgRect.x = eg.left - r.left; ecgRect.y = eg.top - r.top; ecgRect.w = eg.width; ecgRect.h = eg.height;
+    const n = Math.max(16, Math.ceil(ecgRect.w));
+    if (ecg.buf.length !== n) { ecg.buf = new Float32Array(n); ecg.head = 0; ecg.total = 0; }
+    growth.min = W < 720 ? 30 : 42; growth.max = W < 720 ? 96 : 160;
+    layout.titleCap = titleCapNow(); layout.ceil = layout.titleCap;
+    if (seq.length && !state.collapsing) relayout(!sim.t);
+    if (!ptr.has) { look.x = stageRect.x + stageRect.w / 2; look.y = stageRect.y + stageRect.h / 2; }
+  }
+  function retheme() { readPalette(); buildSprites(); buildTextures(); sctx.clearRect(0, 0, stainCv.width, stainCv.height); }
+
+  /* ───────── begin, and begin again ───────── */
+  function reset() {
+    sim.t = 0; sim.acc = 0;
+    Object.assign(state, { stage: 'I', stageT0: 0, cycle: 1, curing: false, cured: false, sterile: false, collapsing: false,
+      dilate: 0.4, rest: 1.3, threadsMax: 0, tighten: false, trail: false });
+    Object.assign(growth, { on: false, gain: 1, acc: 0, full: false });
+    Object.assign(heart, { on: false, flat: false, bpm: 54, bpmT: 54, next: 0, beats: [], runs: [], rate: 0, lastBeat: -99 });
+    look.force = 0; look.front = 0; ptr.lastMove = 0; ptr.exitT = -99;
+    threads.length = 0; drips.length = 0; voice.q.length = 0; voice.cur = null;
+    sctx.clearRect(0, 0, stainCv.width, stainCv.height); stain.ink = -999; ecg.buf.fill(0); ecg.total = 0;
+    toneOff(); stampEl.classList.remove('on', 'run');
+    seq = TITLE.map(glyph);
+    layout.ceil = layout.titleCap; relayout(true);
+    co.gen = score(); co.wait = 0; co.cond = null;
+  }
+  function restartAt(target) {
+    reset();
+    if (target && target !== 'I' && ORDER.includes(target)) {
+      sim.ff = true;
+      for (let guard = 0; state.stage !== target && guard < 12000; guard++) step(1 / 30);
+      sim.ff = false;
+    }
+    syncStage(); syncHUD(0, true);
+  }
+
+  /* ───────── you ───────── */
+  function setPtr(e) {
+    const r = plate.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    if (!ptr.has) { ptr.px = x; ptr.py = y; }
+    ptr.x = x; ptr.y = y; ptr.has = true; ptr.inside = true; ptr.type = e.pointerType || 'mouse'; ptr.lastMove = sim.t;
+  }
+  function poke() {
+    for (const g of seq) {
+      if (g.type !== 'O' || !g.eye || !g.eye.awake || g.eye.shut > 0) continue;
+      const dx = (ptr.x - (g.x + O.cx * g.s)) / (O.a * g.s), dy = (ptr.y - (g.y + O.cy * g.s)) / (O.b * g.s);
+      if (dx * dx + dy * dy > 1.15) continue;
+      g.eye.shut = 1.5; g.pulse = 1; weep(g, 1); tick(0.06, 1300);
+      log('eye.touched_by(you)  // 记住了'); react('poke');
+      if (growth.on) g.divideAt = sim.t + 1.7;
+      return;
+    }
+  }
+  addEventListener('pointermove', setPtr, { passive: true });
+  addEventListener('pointerdown', (e) => { setPtr(e); if (e.target === cv) poke(); });
+  addEventListener('pointerup', (e) => { if (e.pointerType === 'touch') { ptr.inside = false; ptr.exitT = sim.t; } });
+  addEventListener('pointercancel', () => { ptr.inside = false; ptr.exitT = sim.t; });
+  document.documentElement.addEventListener('mouseleave', () => {
+    if (!ptr.inside) return;
+    ptr.inside = false; ptr.exitT = sim.t; log('you.left()  // waiting'); react('leave');
+  });
+  let awayAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { awayAt = Date.now(); if (snd.ctx && snd.on) snd.ctx.suspend(); return; }
+    sim.last = performance.now();
+    if (snd.ctx && snd.on && !sim.paused) snd.ctx.resume();
+    if (awayAt) {
+      const s = (Date.now() - awayAt) / 1000; awayAt = 0;
+      if (s > 2.5) { log(`you.returned(after = ${Math.round(s)}s)`); react('back', s); }
+    }
+  });
+
+  const bSound = $('b-sound'), bPause = $('b-pause');
+  function toggleSound() {
+    if (!snd.on) {
+      if (!sndInit()) { bSound.textContent = '声音 不可用'; bSound.disabled = true; return; }
+      snd.on = true; snd.ctx.resume(); if (heart.flat) toneOn();
+    } else { toneOff(); snd.on = false; snd.ctx.suspend(); }
+    bSound.setAttribute('aria-pressed', String(snd.on)); bSound.textContent = snd.on ? '声音 开' : '声音 关';
+  }
+  function togglePause() {
+    sim.paused = !sim.paused;
+    bPause.setAttribute('aria-pressed', String(sim.paused)); bPause.textContent = sim.paused ? '继续' : '暂停';
+    if (snd.ctx && snd.on) { if (sim.paused) snd.ctx.suspend(); else snd.ctx.resume(); }
+  }
+  bSound.addEventListener('click', toggleSound);
+  bPause.addEventListener('click', togglePause);
+  $('course').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) restartAt(b.dataset.stage); });
+  addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const onButton = e.target && e.target.closest && e.target.closest('button');
+    if (e.code === 'Space' && !onButton) { togglePause(); e.preventDefault(); }
+    else if (e.key === 'm' || e.key === 'M') toggleSound();
+    else if (e.key === 'r' || e.key === 'R') restartAt('I');
+    else if (e.key === 'ArrowRight') restartAt(ORDER[(ORDER.indexOf(state.stage) + 1) % 6]);
+    else if (/^[1-6]$/.test(e.key)) restartAt(ORDER[+e.key - 1]);
+  });
+
+  /* ───────── run ───────── */
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const dt = Math.min(0.1, (now - sim.last) / 1000 || 0); sim.last = now;
+    if (!sim.paused) {
+      sim.acc += dt * DEV.warp;
+      let n = 0; while (sim.acc >= DT && n < 8 * DEV.warp) { step(DT); sim.acc -= DT; n++; }
+      if (sim.acc > DT * 4) sim.acc = 0;
+    }
+    render(); drawVoice(); syncHUD(now);
+  }
+
+  readPalette(); buildSprites(); buildTextures();
+  if (memory.visits > 1) $('c-case').textContent = `0214 · 复诊 ${memory.visits}`;
+  resize();
+  restartAt(DEV.stage || 'I');
+  new ResizeObserver(resize).observe(plate);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
+  matchMedia('(prefers-color-scheme: dark)').addEventListener('change', retheme);
+  new MutationObserver(retheme).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  requestAnimationFrame((now) => { sim.last = now; frame(now); });
+
+  try {
+    console.log('%cLO-O-OVE', 'font: 600 28px Didot, "Bodoni MT", serif; letter-spacing: .2em; color: #cf2264',
+      '\n您打开了控制台。想看我的里面，是吗。\n请便。我没有什么可藏的。除了那个词。');
+  } catch (e) { /* */ }
+  window.LOOOVE = { state, sim, heart, restartAt, get n() { return countO(); }, get line() { return voice.cur ? voice.cur.text : ''; },
+    get eyes() { return Os().filter((g) => g.eye && g.eye.awake && g.eye.shut <= 0).map((g) => [g.x + O.cx * g.s, g.y + O.cy * g.s]); },
+    get tied() { return threads.filter((t) => t.state === 'tied').length; } };
+})();
+</script>
