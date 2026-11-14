@@ -99,7 +99,7 @@
       for (const p of PARAMS) this.params[p.id] = p.def;
       this.mouthOverride = null;   // force a mouth sprite (expressions)
       this.windStrength = 0.5;     // ambient breeze 0..1
-      this.seeThrough = 0.32;      // how strongly eyes show through the bangs
+      this.seeThrough = 0.42;      // how strongly eyes show through the bangs
       this.time = 0;
 
       const hs = layout.head.scale, ox = layout.head.origin[0], oy = layout.head.origin[1];
@@ -108,7 +108,7 @@
       const G = (this.G = {
         Cx: hx(512), Cy: hy(690), Rx: hs * 310, Ry: hs * 390, Rz: hs * 250,
         Nx: layout.pivots.neck[0], Ny: layout.pivots.neck[1],
-        hipX: layout.pivots.hip[0], hipY: layout.pivots.hip[1], shY: 560,
+        hipX: layout.pivots.hip[0], hipY: layout.pivots.hip[1], shY: layout.pivots.shoulderY || 560,
         mouthX: hx(512), mouthY: hy(902), chinY: hy(1035), headTop: hy(100),
         pivotZ: 0.25,
       });
@@ -126,7 +126,8 @@
           id: e.id, tex: e.tex, z: e.z, group: e.group, s: e.s, cols, rows, n,
           rest: new Float32Array(n * 2), pos: new Float32Array(n * 2), uv: new Float32Array(n * 2),
           idx: new Uint16Array(cols * rows * 6),
-          opacity: e.opacity === undefined ? 1 : e.opacity, visible: !e.hidden, clip: null,
+          opacity: e.opacity === undefined ? 1 : e.opacity, base: e.opacity === undefined ? 1 : e.opacity,
+          visible: !e.hidden, clip: null,
           // content rectangle (texture minus padding) in model space
           x0: e.x + m.pad * sx, y0: e.y + m.pad * sy,
           x1: e.x + (m.w - m.pad) * sx, y1: e.y + (m.h - m.pad) * sy,
@@ -266,8 +267,8 @@
       dt = Math.min(dt, 0.05);
       this.time += dt;
       const p = this.params, G = this.G, S = this.S;
-      S.yaw = (p.ParamAngleX / 30) * 13 * DEG;
-      S.pitch = (p.ParamAngleY / 30) * 10 * DEG;
+      S.yaw = (p.ParamAngleX / 30) * 15 * DEG;
+      S.pitch = (p.ParamAngleY / 30) * 11 * DEG;
       S.roll = p.ParamAngleZ * 0.55 * DEG;
       S.bodyX = p.ParamBodyAngleX / 10;
       S.bodyY = p.ParamBodyAngleY / 10;
@@ -425,7 +426,7 @@
         const t = clamp((y - top) / span, 0, 1);
         const ph = (x - G.Cx) / 60;
         const sway = (R.bangs.a + R.bangs.b * t + this._wind(ph, 2.2)) * t * t;
-        this.headPoint(x + sway, y, 0.1, 1);
+        this.headPoint(x + sway, y, 0.14, 1);
         o[i] = this._x; o[i + 1] = this._y;
       }
     }
@@ -501,59 +502,81 @@
 
     _eye(side, openRaw) {
       const P = this.parts, p = this.params, hs = this.hs;
-      const W = P[`eye_${side}_white`];
-      const open = clamp(openRaw, 0, 1.2), open01 = Math.min(open, 1);
+      const W = P[`eye_${side}_white`], I = P[`eye_${side}_iris`];
+      // lids follow the gaze a little: looking up lifts them, looking down lowers them
+      const gy = p.ParamEyeBallY;
+      const open = clamp(openRaw * (1 + (gy > 0 ? 0.1 : 0.16) * gy), 0, 1.2), open01 = Math.min(open, 1);
+      // 1 is the resting, half-lidded look of the illustration; above 1 the
+      // lids pull back twice as fast so "surprised" really widens the eye
+      const wide = Math.max(open - 1, 0) * 2.0;
+      const g = open01 + wide;
       const smile = p.ParamEyeSmile;
       const yBot = W.y1, half = W.w / 2, cx = W.cx;
-      const travel = W.h * 0.8;
-      const lashDy = (1 - open) * travel;
+      const lashDy = (1 - open01) * W.h * 0.8 - wide * W.h;
       const lift = smile * W.h * 0.16;
-      const aOpen = smooth(0.05, 0.24, open);
+      const aOpen = smooth(0.08, 0.26, open);
       const px = hs / 0.405; // art px -> model px factor for hand-tuned offsets
+      // the lids are tilted (outer corner up); iris and catch-light stay upright
+      const cfg = (this.layout.eyes && this.layout.eyes[side]) || { pivot: [W.cx, W.cy], slant: 0, browTilt: 0 };
+      const cs = Math.cos(cfg.slant * DEG), sn = Math.sin(cfg.slant * DEG);
+      const pvx = cfg.pivot[0], pvy = cfg.pivot[1];
       const self = this;
-      const each = (part, fn, depth) => {
+      const each = (part, fn, depth, tilt) => {
         const r = part.rest, o = part.pos;
         for (let i = 0; i < r.length; i += 2) {
           fn(r[i], r[i + 1]);
+          if (tilt) {
+            const dx = self._x - pvx, dy = self._y - pvy;
+            self._x = pvx + dx * cs - dy * sn;
+            self._y = pvy + dx * sn + dy * cs;
+          }
           self.headPoint(self._x, self._y, depth, 1);
           o[i] = self._x; o[i + 1] = self._y;
         }
       };
       each(W, (x, y) => {
-        let yy = yBot - (yBot - y) * Math.max(open, 0.03);
+        let yy = yBot - (yBot - y) * Math.max(g, 0.03);
         yy -= lift * smooth(W.cy, yBot, y);
         self._x = x; self._y = yy;
-      }, 0.04);
-      const bx = p.ParamEyeBallX * 6.2 * px, by = -p.ParamEyeBallY * 4.2 * px;
-      each(P[`eye_${side}_iris`], (x, y) => { self._x = x + bx; self._y = y + by + (1 - open01) * 2 * px; }, 0.05);
-      each(P[`eye_${side}_hl`], (x, y) => { self._x = x + bx * 0.8; self._y = y + by * 0.8 + (1 - open01) * 2 * px; }, 0.06);
+      }, 0.04, true);
+      const bx = p.ParamEyeBallX * 8.5 * px, by = -p.ParamEyeBallY * 4.6 * px;
+      // widening shows more iris: stretch it upward so its top stays under the lid
+      const irisGrow = 1 + wide * 0.85, iBot = I.y1;
+      each(I, (x, y) => { self._x = x + bx; self._y = iBot - (iBot - y) * irisGrow + by + (1 - open01) * 2 * px; }, 0.05, false);
+      each(P[`eye_${side}_hl`], (x, y) => { self._x = x + bx * 0.85; self._y = iBot - (iBot - y) * irisGrow + by * 0.85 + (1 - open01) * 2 * px; }, 0.06, false);
       each(P[`eye_${side}_lower`], (x, y) => {
         const u = (x - cx) / half;
         self._x = x; self._y = y - lift * 0.9 - smile * 1.2 * px * (1 - u * u);
-      }, 0.045);
+      }, 0.045, true);
       each(P[`eye_${side}_lash`], (x, y) => {
         const u = (x - cx) / half;
         const bend = (1 - u * u);
         self._x = x;
-        self._y = y + lashDy + (1 - open01) * 2.4 * px * bend - smile * 1.6 * px * bend * open01;
-      }, 0.05);
-      each(P[`eye_${side}_crease`], (x, y) => { self._x = x; self._y = y + lashDy * 0.8; }, 0.045);
+        self._y = y + lashDy + (1 - open01) * 2.0 * px * bend - smile * 1.6 * px * bend * open01;
+      }, 0.05, true);
+      each(P[`eye_${side}_crease`], (x, y) => { self._x = x; self._y = y + lashDy * 0.8; }, 0.045, true);
       each(P[`eye_${side}_closed`], (x, y) => {
         const u = (x - cx) / half;
         self._x = x; self._y = y - smile * (11.0 * (1 - u * u) - 4.0) * px;
-      }, 0.05);
+      }, 0.05, true);
       const brow = P[`brow_${side}`];
-      const ang = p.ParamBrowAngle * 14 * DEG * (side === 'l' ? 1 : -1);
+      const ang = (p.ParamBrowAngle * 20 + (cfg.browTilt || 0)) * DEG * (side === 'l' ? 1 : -1);
       const cb = Math.cos(ang), sb = Math.sin(ang);
-      const bdy = (-p.ParamBrowY * 5 - Math.max(open - 1, 0) * 8 + (1 - open01) * 1.4) * px;
+      const bdy = (-p.ParamBrowY * 8 - wide * 6 + (1 - open01) * 1.4) * px;
       each(brow, (x, y) => {
         const dx = x - brow.cx, dy = y - brow.cy;
         self._x = brow.cx + dx * cb - dy * sb;
         self._y = brow.cy + dx * sb + dy * cb + bdy;
-      }, 0.05);
+      }, 0.05, false);
 
-      for (const n of ['white', 'iris', 'hl', 'lower', 'lash']) P[`eye_${side}_${n}`].opacity = aOpen;
-      P[`eye_${side}_crease`].opacity = aOpen * (1 - 0.6 * smile) * smooth(0.3, 0.8, open);
+      for (const n of ['white', 'iris', 'hl', 'lower', 'lash']) {
+        const q = P[`eye_${side}_${n}`];
+        q.opacity = aOpen * q.base;
+      }
+      // the faint lower-lid stroke would stack into a double line on a half-shut eye
+      P[`eye_${side}_lower`].opacity *= smooth(0.3, 0.65, open);
+      brow.opacity = brow.base;
+      P[`eye_${side}_crease`].opacity = P[`eye_${side}_crease`].base * aOpen * (1 - 0.6 * smile) * smooth(0.3, 0.8, open);
       P[`eye_${side}_closed`].opacity = 1 - aOpen;
       P[`eye_${side}_closed`].visible = true;
     }
@@ -584,7 +607,7 @@
         if (!part.visible) continue;
         let sx = 1, sy = 1, bend = 0, anchorY = part.cy;
         switch (id) {
-          case 'mouth_closed': sx = 1 + 0.06 * f; bend = f * 2.4 * px; break;
+          case 'mouth_closed': sx = 0.9 + 0.08 * f; bend = f * 2.4 * px; break;
           case 'mouth_smile': sx = 0.92 + 0.1 * f; break;
           case 'mouth_sad': sx = 0.9 - 0.08 * f; break;
           case 'mouth_grin': anchorY = part.y0; sy = lerp(0.75, 1.25, t01(0.1, 0.38)); break;

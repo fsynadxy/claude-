@@ -13,7 +13,7 @@ import os
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 P = json.load(open(os.path.join(ROOT, 'model', 'parts.json')))
 
-HEAD_SCALE = 0.43
+HEAD_SCALE = 0.41        # hair-top-to-chin comes out ~384 px; the reference measures ~378
 CHIN = (542.0, 437.0)                       # model-space position of the chin tip (head-space 512, 1035)
 HEAD_ORIGIN = (CHIN[0] - 512 * HEAD_SCALE, CHIN[1] - 1035 * HEAD_SCALE)
 EYE_REL = 1.04          # eye sheet -> head space
@@ -81,34 +81,81 @@ head('face', 181, 272, 1.0, 100)
 head_c('blush_r', 330, 800, 1.0, 105, tex='blush', opacity=0.0)
 head_c('blush_l', 694, 800, 1.0, 105, tex='blush', opacity=0.0)
 
-EYE_Y = 672            # head-space y of the eye-white top edge
-EYE_DX = 152           # head-space distance of eye centre from the face axis
+# ---- eyes -------------------------------------------------------------------
+# The eye frame (white + lashes) stays close to the sprite sheet: slightly
+# wider and a touch flatter, barely tilted. The gaze comes from the iris: big
+# enough that the upper lid hides its top quarter, resting on the lower lid.
+import numpy as _np
+from PIL import Image as _Image
+
+EYE_BOTTOM = 756       # head-space y of the lower lid
+EYE_DX = 158           # head-space distance of each eye centre from the face axis
+WHITE_SX = 1.2
+WHITE_SY = 0.9
+IRIS_REL = 1.06
+SLANT = 2.0            # degrees the outer corner is raised
+BROW_TILT = 9.0        # degrees the inner brow end is raised from the sprite's stern angle
 FACE_CX = 512
+eyes = {}
+
+
+def _iris_axes(tex):
+    """x of the iris body's centre and of the pupil, in content px."""
+    im = _np.array(_Image.open(os.path.join(ROOT, 'model', 'textures', tex + '.png')))
+    pad = P[tex]['pad']
+    im = im[pad:-pad, pad:-pad]
+    h, w = im.shape[:2]
+    row = _np.nonzero(im[int(h * 0.7), :, 3] > 128)[0]
+    body = (row.min() + row.max()) / 2.0
+    band = im[int(h * 0.38):int(h * 0.58), int(w * 0.3):int(w * 0.7), :3].astype(float).sum(-1).mean(0)
+    k = _np.convolve(band, _np.ones(7) / 7, mode='valid')     # 'same' would zero-pad and fake a dark edge
+    pupil = int(w * 0.3) + 3 + float(_np.argmin(k))
+    return body, pupil
 
 
 def eye(side):
     L = side == 'l'            # character's left = viewer's right
-    w_white = cw(f'eye_{side}_white')
+    w_white = cw(f'eye_{side}_white') * WHITE_SX
+    h_white = ch(f'eye_{side}_white') * WHITE_SY
     cx = FACE_CX + (EYE_DX if L else -EYE_DX)
     ox = cx - w_white * EYE_REL / 2
-    oy = EYE_Y
+    oy = EYE_BOTTOM - h_white * EYE_REL
 
-    def put(name, lx, ly, z, rel=1.0, **kw):
-        tex = name
-        w = cw(tex) * rel
-        if not L:
+    def put(name, lx, ly, z, rel=1.0, sx=1.0, sy=1.0, mirror=True, **kw):
+        """lx, ly: eye-sheet px from the white's top-left, written for the
+        viewer's-right eye and mirrored for the other one."""
+        w = cw(name) * rel * sx
+        if not L and mirror:
             lx = w_white - lx - w
-        head(name, ox + lx * EYE_REL, oy + ly * EYE_REL, EYE_REL * rel, z, **kw)
+        extra = {}
+        if sx != 1.0:
+            extra['sx'] = sx
+        if sy != 1.0:
+            extra['sy'] = sy
+        head(name, ox + lx * EYE_REL, oy + ly * EYE_REL, EYE_REL * rel, z, **extra, **kw)
 
     p = f'eye_{side}_'
-    put(p + 'white', 0, 0, 110)
-    put(p + 'iris', 20 if L else 16, 0, 112)
-    put(p + 'hl', 40 if L else 80, 10, 114, rel=0.62)
-    put(p + 'lower', 24, 74, 116)
-    put(p + 'lash', -16, -15, 118)
-    put(p + 'crease', 16, -34, 119)
-    put(p + 'closed', -4, 52, 120, hidden=True)
-    put('brow_' + side, 14, -70, 122)
+    body, pupil = _iris_axes(p + 'iris')
+    iris_h = ch(p + 'iris') * IRIS_REL
+    inner = -2 if L else 2                                   # both irises sit a hair toward the nose
+    iris_x = w_white / 2 - body * IRIS_REL + inner           # true x: iris sprites are not mirrored
+    iris_y = h_white - iris_h + 3
+    put(p + 'white', 0, 0, 110, sx=WHITE_SX, sy=WHITE_SY)
+    put(p + 'iris', iris_x, iris_y, 112, rel=IRIS_REL, mirror=False)
+    # one small upright catch-light at the top of the pupil, same side in both eyes
+    hl_rel, hl_sx = 0.3, 0.65
+    put(p + 'hl', iris_x + pupil * IRIS_REL - cw(p + 'hl') * hl_rel * hl_sx / 2 + 3, 12, 114,
+        rel=hl_rel, sx=hl_sx, mirror=False)
+    put(p + 'lower', w_white / 2 + 6, h_white - 12, 116, sx=0.62, opacity=0.32)
+    put(p + 'lash', -7, -14, 118, sx=1.2, sy=0.95)
+    put(p + 'crease', w_white / 2 - cw(p + 'crease') * 2.0 / 2 + 10, -30, 119, sx=2.0, sy=0.75, opacity=0.5)
+    put(p + 'closed', 4, h_white - ch(p + 'closed') * 1.35 - 2, 120, sx=1.15, sy=1.35, hidden=True)
+    put('brow_' + side, 22, -76, 122, sx=1.1, opacity=0.85)
+    eyes[side] = {
+        'pivot': [round(hx(cx), 2), round(hy(oy + h_white * EYE_REL / 2), 2)],
+        'slant': -SLANT if L else SLANT,
+        'browTilt': BROW_TILT,
+    }
 
 
 eye('l')
@@ -135,8 +182,10 @@ layout = {
     'pivots': {
         'neck': [round(hx(522), 2), round(hy(1075), 2)],
         'hip': [540, 1000],
+        'shoulderY': 560,
         'faceCenter': [round(hx(512), 2), round(hy(690), 2)],
     },
+    'eyes': eyes,
     'parts': parts,
 }
 json.dump(layout, open(os.path.join(ROOT, 'model', 'layout.json'), 'w'), indent=1)

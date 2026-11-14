@@ -21,14 +21,14 @@
   }
 
   const EXPRESSIONS = {
-    neutral: { name: '平静' },
-    smile: { name: '微笑', ParamMouthForm: 0.95, ParamEyeSmile: 0.55, ParamCheek: 0.35, ParamBrowY: 0.2, eyeL: 0.92, eyeR: 0.92 },
-    joy: { name: '开心', ParamMouthForm: 1, ParamEyeSmile: 1, ParamCheek: 0.6, ParamBrowY: 0.45, eyeL: 0, eyeR: 0, ParamMouthOpenY: 0.62, ParamAngleZ: 5 },
-    surprise: { name: '惊讶', ParamBrowY: 0.95, eyeL: 1.2, eyeR: 1.2, ParamMouthOpenY: 0.7, mouth: 'mouth_o', ParamAngleY: 4 },
-    sad: { name: '难过', ParamMouthForm: -1, ParamBrowAngle: 0.95, ParamBrowY: -0.15, eyeL: 0.74, eyeR: 0.74, ParamEyeBallY: -0.45, ParamAngleY: -9 },
-    angry: { name: '生气', ParamMouthForm: -0.85, ParamBrowAngle: -1, ParamBrowY: -0.5, eyeL: 0.84, eyeR: 0.84, ParamCheek: 0.2, ParamAngleY: -4 },
-    wink: { name: '俏皮', ParamEyeSmile: 0.8, ParamCheek: 0.4, ParamBrowY: 0.3, eyeL: 0, eyeR: 1.05, mouth: 'mouth_tongue_out', ParamAngleZ: 9, ParamMouthOpenY: 0.4 },
-    shy: { name: '害羞', ParamCheek: 1, ParamMouthForm: 0.4, ParamBrowAngle: 0.55, eyeL: 0.8, eyeR: 0.8, ParamEyeBallX: 0.55, ParamEyeBallY: -0.4, ParamAngleY: -6, ParamAngleX: -7 },
+    neutral: { name: '平静', ParamMouthForm: -0.28 },      // the illustration's level, unsmiling mouth
+    smile: { name: '微笑', ParamMouthForm: 1, ParamEyeSmile: 0.75, ParamCheek: 0.35, ParamBrowY: 0.35, ParamBrowAngle: 0.25, eyeL: 0.9, eyeR: 0.9 },
+    joy: { name: '开心', ParamMouthForm: 1, ParamEyeSmile: 1, ParamCheek: 0.6, ParamBrowY: 0.6, ParamBrowAngle: 0.3, eyeL: 0, eyeR: 0, ParamMouthOpenY: 0.62, ParamAngleZ: 5 },
+    surprise: { name: '惊讶', ParamBrowY: 1, ParamBrowAngle: 0.35, eyeL: 1.2, eyeR: 1.2, ParamMouthOpenY: 0.7, mouth: 'mouth_o', ParamAngleY: 5 },
+    sad: { name: '难过', ParamMouthForm: -1, ParamBrowAngle: 1, ParamBrowY: 0.15, eyeL: 0.8, eyeR: 0.8, ParamEyeBallY: -0.55, ParamAngleY: -10 },
+    angry: { name: '生气', ParamMouthForm: -0.9, ParamBrowAngle: -1, ParamBrowY: -0.75, eyeL: 0.8, eyeR: 0.8, ParamCheek: 0.2, ParamAngleY: -5 },
+    wink: { name: '俏皮', ParamEyeSmile: 0.8, ParamCheek: 0.4, ParamBrowY: 0.45, ParamBrowAngle: 0.2, eyeL: 0, eyeR: 1.08, mouth: 'mouth_tongue_out', ParamAngleZ: 9, ParamMouthOpenY: 0.4 },
+    shy: { name: '害羞', ParamCheek: 1, ParamMouthForm: 0.3, ParamBrowAngle: 0.8, ParamBrowY: 0.1, eyeL: 0.82, eyeR: 0.82, ParamEyeBallX: 0.7, ParamEyeBallY: -0.5, ParamAngleY: -7, ParamAngleX: -8 },
   };
   const EXPR_KEYS = ['ParamMouthForm', 'ParamEyeSmile', 'ParamCheek', 'ParamBrowY', 'ParamBrowAngle', 'eyeL', 'eyeR',
     'ParamMouthOpenY', 'ParamEyeBallX', 'ParamEyeBallY', 'ParamAngleX', 'ParamAngleY', 'ParamAngleZ'];
@@ -175,7 +175,7 @@
         if (b.t < 0 && t > b.next) { b.t = 0; b.again = Math.random() < 0.16; }
         if (b.t >= 0) {
           b.t += dt;
-          const c = 0.07, hold = 0.04, op = 0.14;
+          const c = 0.085, hold = 0.05, op = 0.2;       // unhurried lids suit her composed look
           if (b.t < c) b.value = 1 - b.t / c;
           else if (b.t < c + hold) b.value = 0;
           else if (b.t < c + hold + op) { const u = (b.t - c - hold) / op; b.value = u * u * (3 - 2 * u); }

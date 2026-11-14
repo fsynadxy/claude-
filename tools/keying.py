@@ -49,6 +49,19 @@ def key_green(rgb: np.ndarray) -> np.ndarray:
 
     alpha[core] = 1.0
     alpha[bg] = 0.0
+
+    # Solid rim pixels can still carry a little screen colour: an outline that
+    # is 85% ink and 15% green passes as solid but looks olive. Within a few
+    # pixels of the edge, cap green at the proportion the fill colour further
+    # in has (relative to red), which leaves real ink and fill untouched.
+    deep = ndi.binary_erosion(core, iterations=3)
+    if deep.any():
+        ddist, (jy, jx) = ndi.distance_transform_edt(~deep, return_indices=True)
+        inner = p[jy, jx]
+        ratio = inner[..., 1] / np.maximum(inner[..., 0], 1.0)
+        rim = core & ~deep & (ddist <= 6.0)
+        cap = col[..., 0] * np.minimum(ratio, 1.0) * 1.05
+        col[..., 1] = np.where(rim, np.minimum(col[..., 1], cap), col[..., 1])
     alpha[alpha < 0.04] = 0.0
     # kill isolated specks of noise far from any real foreground
     solid = ndi.binary_dilation(core_in, iterations=4)
