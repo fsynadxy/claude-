@@ -1,0 +1,16 @@
+{
+  "name": "long-night-ark",
+  "private": true,
+  "description": "长夜行舟 — an unofficial Arknights fan film, drawn frame by frame from code",
+  "scripts": {
+    "assets": "python3 tools/prep_assets.py",
+    "still": "node tools/render.mjs --still",
+    "render": "node tools/render.mjs"
+  },
+  "devDependencies": {
+    "@expo-google-fonts/barlow-condensed": "*",
+    "@expo-google-fonts/jetbrains-mono": "*",
+    "@expo-google-fonts/noto-sans-sc": "*",
+    "@expo-google-fonts/noto-serif-sc": "*"
+  }
+}

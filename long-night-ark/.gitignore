@@ -1,0 +1,7 @@
+node_modules/
+assets/raw/
+assets/img/
+assets/audio/
+out/frames/
+out/stills/
+*.log

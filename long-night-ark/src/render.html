@@ -1,0 +1,44 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>长夜行舟</title>
+<style>
+  @font-face { font-family: "Noto Serif SC"; font-weight: 600; src: url("../node_modules/@expo-google-fonts/noto-serif-sc/600SemiBold/NotoSerifSC_600SemiBold.ttf"); }
+  @font-face { font-family: "Noto Serif SC"; font-weight: 900; src: url("../node_modules/@expo-google-fonts/noto-serif-sc/900Black/NotoSerifSC_900Black.ttf"); }
+  @font-face { font-family: "Noto Sans SC"; font-weight: 400; src: url("../node_modules/@expo-google-fonts/noto-sans-sc/400Regular/NotoSansSC_400Regular.ttf"); }
+  @font-face { font-family: "Barlow Condensed"; font-weight: 500; src: url("../node_modules/@expo-google-fonts/barlow-condensed/500Medium/BarlowCondensed_500Medium.ttf"); }
+  @font-face { font-family: "Barlow Condensed"; font-weight: 600; src: url("../node_modules/@expo-google-fonts/barlow-condensed/600SemiBold/BarlowCondensed_600SemiBold.ttf"); }
+  @font-face { font-family: "JetBrains Mono"; font-weight: 400; src: url("../node_modules/@expo-google-fonts/jetbrains-mono/400Regular/JetBrainsMono_400Regular.ttf"); }
+  html, body { margin: 0; background: #000; height: 100%; display: grid; place-items: center; }
+  canvas { max-width: 100vw; max-height: 100vh; }
+  #bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px; display: flex; gap: 12px; align-items: center; font: 13px monospace; color: #ccc; background: rgba(0,0,0,.6); }
+  #bar input { flex: 1; }
+</style>
+<canvas id="c" width="1920" height="1080"></canvas>
+<div id="bar" hidden><button id="play">play</button><input id="seek" type="range" min="0" max="172" step="0.01" value="0"><span id="tc">0.00</span></div>
+<audio id="au" src="../assets/audio/score.wav" preload="auto"></audio>
+<script src="film.js"></script>
+<script>
+(async () => {
+  const cv = document.getElementById('c'), ctx = cv.getContext('2d');
+  const man = await (await fetch('../assets.json')).json();
+  const fonts = ['600 60px "Noto Serif SC"', '900 190px "Noto Serif SC"', '400 16px "Noto Sans SC"', '500 21px "Barlow Condensed"', '600 120px "Barlow Condensed"', '400 16px "JetBrains Mono"'];
+  await Promise.all(fonts.map(f => document.fonts.load(f, '长夜行舟 Ark')));
+  const images = {};
+  await Promise.all(Film.keys().map(async k => {
+    const im = new Image(); im.src = `../assets/img/${k}.jpg`; await im.decode(); images[k] = await createImageBitmap(im);
+  }));
+  Film.init(images, man.images);
+  // offline: tools/render.mjs calls this once per frame
+  window.renderFrame = (i, q) => { Film.render(ctx, i / Film.FPS); return cv.toDataURL('image/jpeg', q || 0.95); };
+  window.filmReady = true;
+  // live preview: open this page with #play
+  if (location.hash === '#play') {
+    const bar = document.getElementById('bar'), au = document.getElementById('au'), seek = document.getElementById('seek'), tc = document.getElementById('tc');
+    bar.hidden = false;
+    document.getElementById('play').onclick = () => au.paused ? au.play() : au.pause();
+    seek.oninput = () => { au.currentTime = +seek.value; };
+    const loop = () => { Film.render(ctx, au.currentTime); seek.value = au.currentTime; tc.textContent = au.currentTime.toFixed(2); requestAnimationFrame(loop); };
+    loop();
+  }
+})();
+</script>
