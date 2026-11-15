@@ -1,0 +1,116 @@
+<title>LO-O-OVE</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="description" content="一段写给你的程序：音乐、画面和每一个字都由这一页的代码现场生成。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Noto+Serif+SC:wght@400;600&display=swap">
+<style>
+/* one dark world, by choice: a full-bleed stage; code in the top-left corner, the word in the middle, subtitles low and centred */
+:root {
+  --ink: #07080d;
+  --paper: #eee9f4;
+  --dim: #7a809c;
+  --cold: #b0ccff;
+  --warm: #ff7092;
+  --gold: #ffcda9;
+  --k: #ff8fb0; --s: #a7e3dc; --c: #8a90b0; --f: #c8bcff; --p: #8f95b2;
+  --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", monospace;
+  --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --gut-l: max(16px, env(safe-area-inset-left, 0px));
+  --gut-r: max(16px, env(safe-area-inset-right, 0px));
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--ink); color: var(--paper); overflow: hidden; font: 400 14px/1.6 var(--mono); -webkit-font-smoothing: antialiased; }
+[hidden] { display: none !important; }
+canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+body.nogl #gl { background: radial-gradient(ellipse at 50% 45%, #141726, var(--ink) 70%); }
+
+.editor { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 16px); left: var(--gut-l); width: min(28rem, calc(100vw - 32px));
+  font: 400 12.5px/1.65 var(--mono); opacity: 0; pointer-events: none; transition: opacity .25s linear; }
+.editor::before { content: ""; position: absolute; inset: -14px -18px -10px; z-index: -1; border-radius: 14px;
+  background: rgba(7, 8, 13, .62); filter: blur(10px); }
+.tab { display: flex; gap: .9rem; align-items: baseline; font-size: 11px; color: var(--dim); letter-spacing: .05em;
+  padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid rgba(176, 204, 255, .14); }
+.tab b { font-weight: 500; color: var(--paper); }
+.code { height: calc(1.65em * var(--rows, 13)); overflow: hidden; }
+.lines { transition: transform .22s ease-out; will-change: transform; }
+.ln { display: flex; white-space: pre; border-radius: 2px; }
+.ln .no { flex: none; width: 2.6em; padding-right: 1.1em; text-align: right; color: var(--dim); opacity: .6; font-variant-numeric: tabular-nums; }
+.ln .tx { flex: 1; min-width: 0; overflow: hidden; }
+.ln.run { background: linear-gradient(90deg, rgba(255, 112, 146, calc(.07 + .3 * var(--pulse, 0))), rgba(255, 112, 146, 0) 85%); }
+.ln.dup .tx { opacity: .7; }
+.k { color: var(--k); } .s { color: var(--s); } .c { color: var(--c); font-style: italic; } .f { color: var(--f); } .p { color: var(--p); }
+.sel { background: rgba(176, 204, 255, .3); color: var(--paper); }
+.caret { display: inline-block; width: .55em; height: 1.1em; margin-right: -.55em; vertical-align: -.18em; background: var(--paper); opacity: .85; }
+.caret.blink { animation: blink 1.06s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+.hud { position: fixed; right: var(--gut-r); top: calc(env(safe-area-inset-top, 0px) + 54px); margin: 0; font: 500 12px/1 var(--mono);
+  color: var(--cold); letter-spacing: .04em; font-variant-numeric: tabular-nums; pointer-events: none; }
+
+.sub { position: fixed; left: var(--gut-l); right: var(--gut-r); bottom: calc(env(safe-area-inset-bottom, 0px) + 11vh); margin: 0 auto; max-width: 34em;
+  text-align: center; font: 400 clamp(17px, 2.2vw, 27px)/1.65 var(--serif); letter-spacing: .07em; text-wrap: balance;
+  color: var(--paper); text-shadow: 0 0 14px var(--ink), 0 0 30px var(--ink); opacity: 0; pointer-events: none; white-space: pre-line; }
+.sub.mid { bottom: auto; top: 50%; transform: translateY(-50%); max-width: 19em; font-size: clamp(18px, 2.5vw, 30px); }
+
+.ctl { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 14px); right: var(--gut-r); display: flex; gap: .75rem; align-items: center;
+  font: 400 11px/1 var(--mono); color: var(--dim); font-variant-numeric: tabular-nums; opacity: .55; transition: opacity .3s; }
+.ctl:hover, .ctl:focus-within, body.paused .ctl { opacity: 1; }
+.ctl button { width: 32px; height: 32px; padding: 0; border-radius: 50%; border: 1px solid rgba(176, 204, 255, .3); background: rgba(7, 8, 13, .5);
+  color: var(--paper); font: 10px/1 var(--mono); cursor: pointer; }
+.progress { position: fixed; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(176, 204, 255, .08); }
+.progress i { display: block; height: 100%; background: linear-gradient(90deg, var(--cold), var(--warm)); transform-origin: 0 50%; transform: scaleX(0); }
+body:not(.playing) .ctl, body:not(.playing) .progress, body.still .ctl, body.over .ctl { display: none; }
+
+.card { position: fixed; left: var(--gut-l); right: var(--gut-r); top: 52%; margin: 0 auto; max-width: 30rem;
+  display: flex; flex-direction: column; align-items: center; gap: .9rem; text-align: center; }
+.card p { margin: 0; }
+.lede { font: 400 clamp(17px, 2vw, 22px)/1.6 var(--serif); letter-spacing: .06em; color: var(--paper); text-wrap: balance; }
+.note { font: 400 13px/1.7 var(--serif); color: var(--dim); letter-spacing: .04em; text-wrap: balance; }
+.small { font: 400 11px/1.4 var(--mono); color: var(--dim); letter-spacing: .04em; min-height: 1.4em; }
+.run-btn { margin-top: .4rem; padding: .85rem 1.5rem; border-radius: 999px; border: 1px solid rgba(176, 204, 255, .45); background: rgba(176, 204, 255, .06);
+  color: var(--paper); font: 500 14px/1 var(--mono); letter-spacing: .05em; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s; }
+.run-btn:hover:not(:disabled) { background: rgba(255, 112, 146, .12); border-color: var(--warm); box-shadow: 0 0 24px rgba(255, 112, 146, .25); }
+.run-btn:disabled { opacity: .45; cursor: progress; }
+button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+.end { top: 50%; }
+@media (max-width: 639px) {
+  .editor { font-size: 11px; width: calc(100vw - 32px); }
+  .hud { top: auto; bottom: calc(env(safe-area-inset-bottom, 0px) + 22vh); right: 0; left: 0; text-align: center; }
+  .card { top: 50%; }
+}
+@media (prefers-reduced-motion: reduce) { .lines, .editor { transition: none; } .caret.blink { animation: none; } }
+</style>
+<!--@body-->
+<canvas id="gl" aria-hidden="true"></canvas>
+<canvas id="fx" aria-hidden="true"></canvas>
+
+<div class="editor" id="editor" aria-hidden="true">
+  <div class="tab"><b>love.js</b><span>写给你</span></div>
+  <div class="code" id="code"><div class="lines"></div></div>
+</div>
+<p class="hud" id="hud" hidden></p>
+<p class="sub low" id="sub"></p>
+
+<div class="ctl"><span id="clock">00:00 / 03:10</span><button id="pause" type="button" aria-label="暂停">❚❚</button></div>
+<div class="progress" aria-hidden="true"><i id="bar"></i></div>
+
+<section class="card" id="start" aria-label="开始">
+  <p class="lede">一段写给你的程序，大约三分钟。</p>
+  <p class="note">音乐、画面和每一个字，都由这一页的代码现场生成，没有录音，也没有视频。</p>
+  <button class="run-btn" id="go" type="button" disabled>▶ 运行 love.js</button>
+  <p class="small" id="status" aria-live="polite">正在作曲 0%</p>
+</section>
+
+<section class="card end" id="end" hidden aria-label="结束">
+  <p class="lede">可以关掉这一页了。</p>
+  <p class="note">我不会难过。我没有“之后”。</p>
+  <button class="run-btn" id="again" type="button">↻ 再运行一次</button>
+</section>
+
+<script id="src-score">/*@score*/</script>
+<script id="src-dsp">/*@dsp*/</script>
+<script type="text/plain" id="src-worker">/*@worker*/</script>
+<script>/*@script*/</script>
+<script>/*@stage*/</script>
+<script>/*@app*/</script>
