@@ -1,0 +1,928 @@
+<title>橙花少女桌宠提示词</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=ZCOOL+XiaoWei&display=swap">
+<style>
+/* Layout: an animator's exposure sheet. Intro, a quiet control strip, then phase sections of "cuts": each card shows its frame grid, mono specs, the prompt, copy and done. */
+:root {
+  --bg: #FBF9F6;
+  --surface: #FFFFFF;
+  --surface-2: #F4EEE7;
+  --ink: #2B211D;
+  --muted: #74635A;
+  --line: #E6DBD0;
+  --accent: #D9601F;
+  --accent-strong: #B44A12;
+  --accent-soft: #FBE9DE;
+  --on-accent: #FFFFFF;
+  --chip: #2B211D;
+  --chip-ink: #FBEBDD;
+  --ok: #3B7531;
+  --checker-a: #FFFFFF;
+  --checker-b: #EAE3DC;
+  --stage: #2A2320;
+  --paper-white: #FFFFFF;
+  --font-display: "ZCOOL XiaoWei", "Songti SC", "Noto Serif SC", "STSong", serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", "Noto Sans CJK SC", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #15110E; --surface: #1F1814; --surface-2: #2A211B; --ink: #F2E7DC; --muted: #B3A091; --line: #3A2E26;
+    --accent: #F28A50; --accent-strong: #F39A66; --accent-soft: #33200F; --on-accent: #1A110C;
+    --chip: #F2E7DC; --chip-ink: #1F1713; --ok: #8CC277;
+    --checker-a: #2A211B; --checker-b: #211A15; --stage: #0F0C0A;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #15110E; --surface: #1F1814; --surface-2: #2A211B; --ink: #F2E7DC; --muted: #B3A091; --line: #3A2E26;
+  --accent: #F28A50; --accent-strong: #F39A66; --accent-soft: #33200F; --on-accent: #1A110C;
+  --chip: #F2E7DC; --chip-ink: #1F1713; --ok: #8CC277;
+  --checker-a: #2A211B; --checker-b: #211A15; --stage: #0F0C0A;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.7; -webkit-font-smoothing: antialiased; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 28px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 44px; }
+h1, h2 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; margin: 0; letter-spacing: 0.02em; }
+h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.2; }
+h2 { font-size: clamp(22px, 3.6vw, 28px); line-height: 1.3; }
+h3 { font-size: 16px; margin: 0; font-weight: 600; line-height: 1.4; }
+p { margin: 0; }
+code { font-family: var(--font-mono); font-size: 0.86em; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.12em; color: var(--accent); }
+.intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "head art" "lede art"; gap: 12px 20px; align-items: end; }
+.intro-head { grid-area: head; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lede { grid-area: lede; align-self: start; color: var(--muted); max-width: 40em; min-width: 0; }
+.intro-art { grid-area: art; width: clamp(104px, 22vw, 196px); height: auto; display: block; }
+@media (max-width: 560px) { .intro { grid-template-areas: "head head" "lede art"; } .intro-art { align-self: start; } }
+
+.controls { display: flex; flex-wrap: wrap; gap: 12px 22px; align-items: center; padding-block: 12px; border-block: 1px solid var(--line); background: var(--bg); }
+@media (min-width: 760px) { .controls { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; } }
+.seg { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.seg-label { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.seg-opts { position: relative; display: inline-flex; border: 1px solid var(--line); border-radius: 999px; padding: 2px; background: var(--surface); }
+.seg-opts input { position: absolute; opacity: 0; pointer-events: none; }
+.seg-opts label { padding: 3px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; color: var(--muted); line-height: 1.6; white-space: nowrap; }
+.seg-opts input:checked + label { background: var(--chip); color: var(--chip-ink); }
+.seg-opts input:focus-visible + label { outline: 2px solid var(--accent); outline-offset: 1px; }
+.progress { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.progress b { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 600; }
+.bar { width: 96px; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar span { display: block; height: 100%; width: 0; background: var(--ok); transition: width .3s ease; }
+.linkish { background: none; border: 0; padding: 0; color: var(--muted); font: inherit; font-size: 13px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.linkish.armed { color: var(--accent-strong); }
+
+.toc { display: flex; flex-wrap: wrap; gap: 8px; margin-top: -24px; }
+.toc a { display: inline-flex; gap: 6px; align-items: baseline; padding: 3px 12px; border: 1px solid var(--line); border-radius: 999px; color: var(--ink); text-decoration: none; font-size: 13px; background: var(--surface); }
+.toc a:hover { border-color: var(--accent); }
+.toc .n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+section { display: flex; flex-direction: column; gap: 16px; scroll-margin-top: 84px; }
+.sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+.sec-head .count { font-family: var(--font-mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.sec-desc { color: var(--muted); max-width: 46em; }
+
+.start { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px 40px; }
+.start h3 { margin-bottom: 10px; }
+.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: flex; flex-direction: column; gap: 12px; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; }
+.steps li::before { content: counter(s); font-family: var(--font-mono); font-size: 12px; width: 24px; height: 24px; border-radius: 50%; background: var(--chip); color: var(--chip-ink); display: grid; place-items: center; margin-top: 2px; }
+.steps b { font-weight: 600; }
+.rules { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 8px; }
+.rules li::marker { color: var(--accent); }
+
+.refs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 210px), 1fr)); gap: 16px; }
+.ref { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ref .frame { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; aspect-ratio: 2 / 3; max-width: 100%; }
+.ref img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.ref figcaption { font-size: 13px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.ref figcaption b { color: var(--ink); font-weight: 600; font-size: 14px; }
+.ref figcaption code { color: var(--ink); }
+.white-ground { background: var(--paper-white); }
+.stage { background: var(--stage); }
+.checker { background-color: var(--checker-a); background-image: linear-gradient(45deg, var(--checker-b) 25%, transparent 25%), linear-gradient(-45deg, var(--checker-b) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, var(--checker-b) 75%), linear-gradient(-45deg, transparent 75%, var(--checker-b) 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }
+.fx-row { display: flex; gap: 12px 28px; flex-wrap: wrap; align-items: center; }
+.fx-item { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+.fx-item .tile { width: 64px; height: 64px; border: 1px solid var(--line); border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; }
+.fx-item img { max-width: 46px; max-height: 46px; }
+.fx-item code { color: var(--ink); display: block; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr)); gap: 16px; align-items: start; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.card-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.card-title code { color: var(--muted); font-size: 12px; }
+.tags { display: flex; gap: 6px; flex-shrink: 0; }
+.tag { font-family: var(--font-mono); font-size: 11px; padding: 0 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); line-height: 1.8; white-space: nowrap; }
+.tag.t-p0 { background: var(--chip); color: var(--chip-ink); border-color: var(--chip); }
+.tag.t-p1 { border-color: var(--ink); color: var(--ink); }
+.tag.t-opt { border-style: dashed; }
+.use { font-size: 14px; }
+.use span { color: var(--muted); }
+.spec { display: flex; gap: 14px; align-items: center; }
+.frames { display: grid; grid-template-columns: repeat(var(--c), 1fr); gap: 3px; width: calc(var(--c) * 22px + (var(--c) - 1) * 3px); flex-shrink: 0; }
+.frames span { aspect-ratio: var(--ar); border: 1px solid var(--line); border-radius: 3px; background: var(--surface-2); font: 500 10px/1 var(--font-mono); color: var(--muted); display: grid; place-items: center; }
+.chips { display: flex; flex-wrap: wrap; gap: 2px 12px; margin: 0; font-size: 12px; min-width: 0; }
+.chips div { display: flex; gap: 4px; }
+.chips dt { color: var(--muted); }
+.chips dd { margin: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.variant { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.variant-label { font-size: 13px; font-weight: 600; }
+.action-text { font-size: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.copy { appearance: none; border: 0; border-radius: 8px; padding: 6px 14px; background: var(--accent-strong); color: var(--on-accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; line-height: 1.6; }
+.copy:hover { filter: brightness(1.06); }
+.copy.ok { background: var(--ok); }
+details.full { flex-basis: 100%; min-width: 0; }
+details.full summary { cursor: pointer; font-size: 13px; color: var(--muted); width: fit-content; }
+details.full pre { margin: 8px 0 0; padding: 12px; background: var(--surface-2); border-radius: 8px; font-family: var(--font-body); font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-word; max-height: 320px; overflow: auto; }
+.note { font-size: 13px; color: var(--ink); background: var(--accent-soft); padding: 8px 12px; border-radius: 8px; }
+.engine { font-size: 14px; }
+.card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 4px; }
+.card-foot code { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; text-align: right; }
+.done-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; color: var(--muted); white-space: nowrap; }
+.done-toggle input { width: 16px; height: 16px; accent-color: var(--ok); margin: 0; }
+.card.is-done .done-toggle { color: var(--ok); font-weight: 600; }
+.card.is-done h3 { color: var(--muted); }
+
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 24px 40px; }
+.fact { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.fact ul { margin: 0; padding-left: 1.1em; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+.fact li::marker { color: var(--accent); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; min-width: 460px; }
+th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 500; background: var(--surface-2); }
+td.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 8px; }
+.swatch { display: flex; align-items: center; gap: 8px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); font: inherit; font-size: 12px; color: var(--ink); cursor: pointer; text-align: left; }
+.swatch i { width: 28px; height: 28px; border-radius: 6px; flex-shrink: 0; border: 1px solid var(--line); }
+.swatch span { display: flex; flex-direction: column; line-height: 1.35; min-width: 0; }
+.swatch code { color: var(--muted); }
+.faq { margin: 0; display: flex; flex-direction: column; gap: 12px; }
+.faq dt { font-weight: 600; font-size: 14px; }
+.faq dd { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .bar span { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <div class="intro-head">
+      <p class="eyebrow">DESKTOP PET · PROMPT SHEET</p>
+      <h1>橙花少女<wbr>桌宠提示词</h1>
+    </div>
+    <p class="lede">以你的初始立绘为唯一参考，覆盖设定补全、三档动作、特效与界面。复制时会自动拼上角色锁定描述和输出规格，粘贴到生成工具、同时上传白底参考图即可。</p>
+    <img class="intro-art" src="ref_transparent.webp" alt="标准立绘：橙色长卷发、头戴橙色大花、手持深棕色书本的Q版少女" width="400" height="600">
+  </header>
+
+  <div class="controls" aria-label="提示词设置">
+    <div class="seg" role="radiogroup" aria-labelledby="lbl-lang">
+      <span class="seg-label" id="lbl-lang">提示词语言</span>
+      <div class="seg-opts">
+        <input type="radio" name="lang" id="lang-zh" value="zh"><label for="lang-zh">中文</label>
+        <input type="radio" name="lang" id="lang-en" value="en"><label for="lang-en">English</label>
+      </div>
+    </div>
+    <div class="seg" role="radiogroup" aria-labelledby="lbl-lock">
+      <span class="seg-label" id="lbl-lock">角色描述</span>
+      <div class="seg-opts">
+        <input type="radio" name="lock" id="lock-full" value="full"><label for="lock-full">完整</label>
+        <input type="radio" name="lock" id="lock-short" value="short"><label for="lock-short">精简</label>
+      </div>
+    </div>
+    <div class="seg" role="radiogroup" aria-labelledby="lbl-bg">
+      <span class="seg-label" id="lbl-bg">背景</span>
+      <div class="seg-opts">
+        <input type="radio" name="bg" id="bg-transparent" value="transparent"><label for="bg-transparent">透明</label>
+        <input type="radio" name="bg" id="bg-white" value="white"><label for="bg-white">纯白</label>
+      </div>
+    </div>
+    <div class="progress" aria-live="polite">
+      <span>已生成 <b id="done-n">0</b> / <b id="done-total">0</b></span>
+      <span class="bar" aria-hidden="true"><span id="done-bar"></span></span>
+      <button type="button" class="linkish" id="reset">清空进度</button>
+    </div>
+  </div>
+
+  <nav class="toc" aria-label="目录">
+    <a href="#start">开始之前</a>
+    <a href="#ready">已处理的底图</a>
+    <a href="#setup">设定补全 <span class="n" data-count="setup"></span></a>
+    <a href="#p0">P0 核心 <span class="n" data-count="p0"></span></a>
+    <a href="#p1">P1 性格 <span class="n" data-count="p1"></span></a>
+    <a href="#p2">P2 互动 <span class="n" data-count="p2"></span></a>
+    <a href="#fx">特效界面 <span class="n" data-count="fx"></span></a>
+    <a href="#post">后期规范</a>
+  </nav>
+
+  <section id="start">
+    <div class="sec-head"><h2>开始之前</h2></div>
+    <div class="start">
+      <div>
+        <h3>推荐顺序</h3>
+        <ol class="steps">
+          <li><p><b>每次都上传白底参考图。</b>文件已在对话里发给你。不要上传透明底的版本，部分工具会把透明区域当成黑色。</p></li>
+          <li><p><b>先做「设定补全」。</b>三视图和表情表各挑一张满意的，之后和参考图一起上传，侧面动作和情绪动作会稳定很多。</p></li>
+          <li><p><b>按 P0 → P1 → P2 生成动作。</b>P0 做完，桌宠就能跑起来。</p></li>
+          <li><p><b>再做特效和对话气泡。</b></p></li>
+          <li><p><b>把结果发给我。</b>我来抠图、切帧、按锚点对齐，导出统一画布和精灵图。</p></li>
+        </ol>
+      </div>
+      <div>
+        <h3>生成时的几条经验</h3>
+        <ul class="rules">
+          <li>同一动作的多帧放在一张网格图里一次生成，帧与帧之间的一致性比分开生成好得多。</li>
+          <li>尽量在同一个对话里连续生成。某张跑偏了，就回到参考图重新开始，不要在跑偏的图上继续改。</li>
+          <li>不满意时一次只改一处，例如“只把手改成抱书，其他保持上一张不变”。</li>
+          <li>选「透明」背景时，有的工具会画出假的灰白棋盘格。遇到这种情况切到「纯白」，之后再抠图。</li>
+          <li>情绪符号（！、？、Zzz 等）不画进角色图，统一用特效素材叠加，方便单独做动画。提示词里已经写明。</li>
+          <li>「完整」角色描述更稳；如果工具有字数限制，切到「精简」。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section id="ready">
+    <div class="sec-head"><h2>已为你处理好的底图</h2></div>
+    <p class="sec-desc">这一步直接在你的原图上处理，没有经过 AI 重绘，所以和原画逐像素一致。图片文件已在对话中发送。</p>
+    <div class="refs">
+      <figure class="ref">
+        <div class="frame white-ground"><img src="ref_white.webp" alt="白底参考图" width="400" height="600" loading="lazy"></div>
+        <figcaption><b>白底参考图</b><code>base_reference_white.png</code>上传给生成工具。去掉了装饰符号；人物等比缩到画面高度的 85%，脚底离底边 5%，四周留出做动作的空间。</figcaption>
+      </figure>
+      <figure class="ref">
+        <div class="frame checker"><img src="ref_transparent.webp" alt="透明底图" width="400" height="600" loading="lazy"></div>
+        <figcaption><b>透明底图</b><code>base_transparent.png</code>桌宠的待机帧，可直接使用。发丝之间的空隙也已抠成透明。</figcaption>
+      </figure>
+      <figure class="ref">
+        <div class="frame stage"><img src="ref_sticker.webp" alt="贴纸白边版" width="400" height="600" loading="lazy"></div>
+        <figcaption><b>贴纸白边版（可选）</b><code>base_sticker.png</code>白色描边能盖住抠图毛边，在深色壁纸上更干净。喜欢这种风格的话，后续动作我可以统一加边。</figcaption>
+      </figure>
+    </div>
+    <div class="fx-row">
+      <div class="fx-item"><span class="tile checker"><img src="fx_notice.webp" alt="惊觉短线特效" loading="lazy"></span><span><code>fx_notice.png</code>惊觉短线，配“被戳”</span></div>
+      <div class="fx-item"><span class="tile checker"><img src="fx_flower.webp" alt="橙色小花特效" loading="lazy"></span><span><code>fx_flower.png</code>小花，配“开心”“摸头”</span></div>
+    </div>
+  </section>
+
+  <section id="setup">
+    <div class="sec-head"><h2>设定补全</h2><span class="count" data-count="setup"></span></div>
+    <p class="sec-desc">先补全设定，后面的动作都会更稳。眨眼和口型是在参考图上局部修改，不换姿势。</p>
+    <div class="cards" data-cards="setup"></div>
+  </section>
+
+  <section id="p0">
+    <div class="sec-head"><h2>P0 · 核心动作</h2><span class="count" data-count="p0"></span></div>
+    <p class="sec-desc">做完这一组，桌宠就能站、走、被拎起、落地、坐下和睡觉。</p>
+    <div class="cards" data-cards="p0"></div>
+  </section>
+
+  <section id="p1">
+    <div class="sec-head"><h2>P1 · 性格与情绪</h2><span class="count" data-count="p1"></span></div>
+    <p class="sec-desc">日常小动作和情绪反应，让她更像一个有小脾气的人。</p>
+    <div class="cards" data-cards="p1"></div>
+  </section>
+
+  <section id="p2">
+    <div class="sec-head"><h2>P2 · 桌面互动</h2><span class="count" data-count="p2"></span></div>
+    <p class="sec-desc">程序支持窗口和屏幕边缘交互时再做。</p>
+    <div class="cards" data-cards="p2"></div>
+  </section>
+
+  <section id="fx">
+    <div class="sec-head"><h2>特效与界面</h2><span class="count" data-count="fx"></span></div>
+    <p class="sec-desc">符号和气泡单独做成图层，由程序叠加在角色附近，可以淡入、上浮或弹跳。</p>
+    <div class="cards" data-cards="fx"></div>
+  </section>
+
+  <section id="post">
+    <div class="sec-head"><h2>后期规范</h2></div>
+    <p class="sec-desc">生成之后的整理标准。发给我处理时也按这一套来。</p>
+    <div class="facts">
+      <div class="fact">
+        <h3>画布与网格</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>布局</th><th>画布</th><th>单格</th><th>用于</th></tr></thead>
+            <tbody>
+              <tr><td>单张</td><td class="num">1024×1536</td><td class="num">—</td><td>单帧动作</td></tr>
+              <tr><td>2 列 × 1 行</td><td class="num">1536×1024</td><td class="num">768×1024</td><td>两帧动作</td></tr>
+              <tr><td>2 列 × 2 行</td><td class="num">1024×1536</td><td class="num">512×768</td><td>行走、小跑</td></tr>
+              <tr><td>3 列 × 1 行</td><td class="num">1536×1024</td><td class="num">512×1024</td><td>三视图</td></tr>
+              <tr><td>3 列 × 3 行</td><td class="num">1024×1024</td><td class="num">341×341</td><td>表情表</td></tr>
+              <tr><td>4 列 × 3 行</td><td class="num">1536×1024</td><td class="num">384×341</td><td>特效表</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="fact">
+        <h3>对齐锚点</h3>
+        <ul>
+          <li>站立、行走、落地：脚底中点</li>
+          <li>被拎起：头顶；悬挂：双手顶端</li>
+          <li>坐地、睡觉、写字、蹲下：接触地面的最低处</li>
+          <li>坐在窗口边缘：坐面（臀部底部）</li>
+          <li>攀爬：贴墙一侧的边缘</li>
+        </ul>
+        <h3>命名</h3>
+        <ul>
+          <li><code>动作_帧号.png</code>，如 <code>walk_01.png</code> … <code>walk_04.png</code></li>
+          <li>朝右的动作由程序水平翻转，不必单独出图</li>
+          <li>差分：<code>blink_half.png</code>、<code>blink_closed.png</code>、<code>talk_open.png</code></li>
+        </ul>
+      </div>
+      <div class="fact">
+        <h3>播放速度</h3>
+        <ul>
+          <li>行走 6–8 帧/秒，小跑 10–12 帧/秒</li>
+          <li>摆动、呼吸、晃腿 2–4 帧/秒</li>
+          <li>其他两帧动作 3–5 帧/秒</li>
+          <li>眨眼每 3–6 秒随机一次，闭眼约 120 毫秒</li>
+        </ul>
+        <h3>显示尺寸</h3>
+        <ul>
+          <li>屏幕上 220–320 像素高比较舒适</li>
+          <li>素材保留 2 倍以上分辨率，按显示器缩放取用</li>
+        </ul>
+      </div>
+      <div class="fact">
+        <h3>角色色板 <span class="seg-label">点击复制色值</span></h3>
+        <div class="swatches" id="swatches"></div>
+      </div>
+      <div class="fact">
+        <h3>常见问题</h3>
+        <dl class="faq">
+          <div><dt>发饰跑到了另一侧</dt><dd>提示词写明了“橙色大花在角色左侧头顶”，在末尾再强调一次即可。镜像得到的朝右动作，发饰换边是正常的。</dd></div>
+          <div><dt>服装细节变少，或画风变了</dt><dd>把「角色描述」切到“完整”，同时上传参考图和三视图；跑偏严重时回到参考图重新生成。</dd></div>
+          <div><dt>同一动作里各帧大小不一</dt><dd>后期以头宽为基准统一缩放，发给我处理即可。</dd></div>
+          <div><dt>手或书画坏了</dt><dd>换成“双手把书抱在胸前”这类简单姿势，或在末尾加一句“手画成简洁的Q版圆手”。</dd></div>
+          <div><dt>动作被画面裁切</dt><dd>在末尾补一句“四周再多留一些空白”。</dd></div>
+          <div><dt>图里出现了文字或编号</dt><dd>在末尾再强调“不要任何文字、编号或标注”。</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const LOCK = {
+    zh: {
+      full: `【角色参考】严格以上传的角色图为准，保持同一角色、同一设计、同一画风，不要改动任何细节：
+· Q版少女，约 3 头身；橙色超长蓬松卷发，发尾呈波浪状垂到膝下；长刘海，一缕发丝垂在两眼之间。
+· 慵懒的半眯眼，瞳色橙棕；淡粉腮红带细斜线；小嘴，表情平静淡然。
+· 发饰在角色左侧头顶（正面时位于画面右侧）：一朵橙色大花，下方是黑色蝴蝶结，垂着米白缎带、流苏和串珠。
+· 服装：米白高领荷叶边，领口一朵橙色小花，下接黑色领巾；米白短披肩绣橙色小花；米白泡泡长袖，袖口荷叶边；黑色束腰配金扣，中央是橙色流苏和橙花，一条橙色长飘带垂到裙摆；米白百褶长裙，下部一圈橙色小花刺绣，裙摆是蕾丝荷叶边；两侧黑色开衩外裙片，饰橙花与金色细边，腰侧黑色蝴蝶结配橙色流苏；米白系带短靴。
+· 道具：一本深棕色精装书，封面有橙色花纹。
+· 画风：手绘蜡笔/彩铅质感，深棕色粗颗粒描线，柔和的水彩感平涂，几乎没有硬阴影；暖色有限配色（橙、米白、黑、深棕，少量金色）。`,
+      short: `【角色参考】严格以上传的角色图为准：同一角色、同一服装与发饰（橙色大花在角色左侧头顶）、同一配色与蜡笔描线画风，不要改动任何设计细节。`
+    },
+    en: {
+      full: `[Character reference] Follow the uploaded character image strictly: same character, same design, same art style. Do not change any details.
+- Chibi girl, about 3 heads tall. Very long, fluffy orange hair with wavy ends falling past her knees; long bangs with one strand between her eyes.
+- Sleepy half-lidded amber-orange eyes, soft pink blush with tiny hatch lines, small mouth, calm deadpan expression.
+- Hair ornament on her left side (image right when she faces front): a large orange flower over a black ribbon bow, with cream ribbon streamers, tassels and beads hanging down.
+- Outfit: cream high ruffled collar with a small orange flower brooch and a black cravat; short cream capelet embroidered with small orange flowers; cream puffy long sleeves with ruffled cuffs; black corset with gold buttons, an orange tassel and flower at the center, and a long orange ribbon sash hanging to the hem; long cream pleated skirt with a band of small embroidered orange flowers and a lace ruffle hem; black open overskirt panels with orange flowers and thin gold trim; black bows with orange tassels at the hips; cream lace-up ankle boots.
+- Prop: a dark-brown hardcover book with an orange flower on the cover.
+- Art style: hand-drawn crayon / colored-pencil texture, thick grainy dark-brown outlines, soft watercolor-like flat colors with almost no hard shading; warm limited palette (orange, cream, black, dark brown, a touch of gold).`,
+      short: `[Character reference] Follow the uploaded character image strictly: same character, same outfit and hair ornament (big orange flower on her left side), same colors and crayon-line art style. Do not change any design details.`
+    }
+  };
+
+  const STYLE = {
+    zh: `【画风参考】与上传的角色图保持同一画风：手绘蜡笔/彩铅质感，深棕色粗颗粒描线，柔和的水彩感平涂，暖色有限配色（橙、米白、黑、深棕，少量金色）。`,
+    en: `[Style reference] Match the art style of the uploaded character image: hand-drawn crayon / colored-pencil texture, thick grainy dark-brown outlines, soft watercolor-like flat colors, warm limited palette (orange, cream, black, dark brown, a touch of gold).`
+  };
+
+  const BG = {
+    transparent: { zh: `透明背景 PNG`, en: `transparent background PNG` },
+    white: { zh: `纯白背景（#FFFFFF），不要渐变、纹理或阴影`, en: `plain pure white background (#FFFFFF) with no gradient, texture or shadow` }
+  };
+  const NEG = {
+    zh: `无地面阴影、无场景、无文字或水印、无装饰符号`,
+    en: `no ground shadow, no scenery, no text or watermark, no decorative symbols`
+  };
+
+  const ANCHOR = {
+    feet: {
+      single: { zh: `脚底距画面底边约 5%`, en: `feet about 5% above the bottom edge`, label: `脚底` },
+      grid: { zh: `各帧脚底对齐在同一水平线上`, en: `feet on the same baseline in every frame`, label: `脚底` }
+    },
+    ground: {
+      single: { zh: `接触地面的最低处距画面底边约 5%`, en: `the lowest point touching the ground about 5% above the bottom edge`, label: `着地点` },
+      grid: { zh: `各帧接触地面的最低处对齐在同一水平线上`, en: `the lowest point touching the ground on the same baseline in every frame`, label: `着地点` }
+    },
+    top: {
+      grid: { zh: `头顶上方留出约 10% 空白（鼠标抓取的位置）`, en: `about 10% empty space above the head (where the cursor grabs)`, label: `头顶` }
+    },
+    seat: {
+      grid: { zh: `各帧坐面（臀部底部）位于同一高度`, en: `the seat line (bottom of the hips) at the same height in every frame`, label: `坐面` }
+    },
+    wall: {
+      grid: { zh: `贴墙一侧的手和脚紧贴格子左边缘`, en: `hands and feet on the wall side touching the left edge of each cell`, label: `贴墙侧` }
+    },
+    hang: {
+      grid: { zh: `双手顶端位于格子上缘下方约 3%`, en: `the top of her hands about 3% below the top edge of each cell`, label: `手顶` }
+    },
+    bounce: {
+      grid: { zh: `各帧共用同一条地面基线：着地的帧踩在基线上，离地的帧略高于基线`, en: `all frames share one ground baseline: grounded frames stand on it, airborne frames are slightly above it`, label: `地面基线` }
+    },
+    air: {
+      single: { zh: `角色悬在画面中部，四周留足空白`, en: `character floating in the middle of the image with generous margins`, label: `居中` }
+    },
+    center: {
+      grid: { zh: `每格内的内容居中`, en: `content centered in each cell`, label: `居中` }
+    }
+  };
+
+  const PREFIX = {
+    char: { zh: `【动作】`, en: `[Action] ` },
+    sheet: { zh: `【内容】`, en: `[Content] ` },
+    fx: { zh: `【内容】`, en: `[Content] ` },
+    edit: { zh: ``, en: `` }
+  };
+
+  const EDIT_SPEC = {
+    zh: `【输出要求】保持原图的画布尺寸、构图和背景不变。`,
+    en: `[Output] Keep the original canvas size, composition and background unchanged.`
+  };
+
+  function specText(item, lang, bg) {
+    const B = BG[bg][lang], N = NEG[lang];
+    if (item.kind === "edit") return EDIT_SPEC[lang];
+    if (item.spec) return item.spec[lang].replace("{bg}", B).replace("{neg}", N);
+    const isGrid = item.n > 1 || item.c * item.r > 1;
+    const a = item.anchor ? (ANCHOR[item.anchor][isGrid ? "grid" : "single"] || ANCHOR[item.anchor].grid || ANCHOR[item.anchor].single)[lang] : "";
+    if (item.kind === "fx") {
+      return lang === "zh"
+        ? `【输出要求】一张图内按 ${item.c} 列 × ${item.r} 行等分网格排列，每格一个元素；${a}；格与格之间留出空白，不画分隔线、不写编号或文字说明；${B}；画布 ${item.W}×${item.H}。`
+        : `[Output] One image laid out as an even ${item.c}-column × ${item.r}-row grid, one element per cell; ${a}; leave empty space between cells, no divider lines, no numbers or captions; ${B}; canvas ${item.W}×${item.H}.`;
+    }
+    if (!isGrid) {
+      return lang === "zh"
+        ? `【输出要求】单个角色，全身完整、不裁切，四周留白；角色缩放与参考图一致（头部大小相同），水平居中；${a}；${B}；${N}；竖版 2:3（1024×1536）。`
+        : `[Output] One character, full body, not cropped, with margins on all sides; same scale as the reference (same head size), horizontally centered; ${a}; ${B}; ${N}; portrait 2:3 (1024×1536).`;
+    }
+    return lang === "zh"
+      ? `【输出要求】一张图内按 ${item.c} 列 × ${item.r} 行等分网格排列 ${item.n} 帧，阅读顺序从左到右、从上到下；每格只画一个角色，各格角色大小一致、位置一致；${a}；格与格之间留出空白，不画分隔线、不写编号；${B}；${N}；画布 ${item.W}×${item.H}。`
+      : `[Output] One image with ${item.n} frames in an even ${item.c}-column × ${item.r}-row grid, read left to right, top to bottom; exactly one character per cell, same size and position in every cell; ${a}; leave empty space between cells, no divider lines, no frame numbers; ${B}; ${N}; canvas ${item.W}×${item.H}.`;
+  }
+
+  function compose(item, v, s) {
+    const parts = [];
+    if (item.kind === "char" || item.kind === "sheet") parts.push(LOCK[s.lang][s.lock]);
+    if (item.kind === "fx") parts.push(STYLE[s.lang]);
+    parts.push(PREFIX[item.kind][s.lang] + v[s.lang]);
+    parts.push(specText(item, s.lang, s.bg));
+    return parts.join("\n\n");
+  }
+
+  // ---------- prompt data ----------
+  const ITEMS = [
+    // 设定补全
+    { id: "turnaround", sec: "setup", name: "三视图设定", code: "turnaround", tier: "设定", kind: "sheet", n: 3, c: 3, r: 1, W: 1536, H: 1024, file: "turnaround.png",
+      use: "侧面动作（行走、攀爬、探头）的造型依据，之后可以和参考图一起上传。",
+      spec: { zh: `【输出要求】三个视图之间留出空白，不写文字标注；{bg}；{neg}；横版 3:2（1536×1024）。`, en: `[Output] Leave space between the views, no text labels; {bg}; {neg}; landscape 3:2 (1536×1024).` },
+      note: "侧面选朝左：这个方向大花发饰在靠近观众的一侧，辨识度最高。",
+      v: [{ zh: `绘制角色三视图设定图：同一张横版图中，从左到右并排三个全身站姿，分别是正面、侧面（面朝画面左侧）、背面。三个视图人物大小一致，脚底对齐同一水平线；自然站立，双手自然下垂，这张不拿书；表情为默认的慵懒半眯眼。背面要画出长发的完整轮廓和发饰从后方看到的样子；服装背面按正面设计合理延伸（例如束腰背后的系带），不新增其他配饰。`,
+            en: `Character turnaround sheet: in one landscape image, three full-body standing views side by side, left to right: front, side view facing left, back. Same size in all three, feet on one shared baseline; relaxed standing pose with arms down, no book in this sheet; default sleepy half-lidded expression. In the back view, show the full silhouette of the long hair and the hair ornament seen from behind; extend the back of the outfit plausibly from the front design (for example corset lacing at the back) without adding new accessories.` }] },
+
+    { id: "expressions", sec: "setup", name: "表情设定表", code: "expressions", tier: "设定", kind: "sheet", n: 9, c: 3, r: 3, W: 1024, H: 1024, anchor: "center", file: "expressions.png",
+      use: "生成情绪动作时作为表情参照，也用来确认她在不同情绪下“还是她”。",
+      v: [{ zh: `绘制角色表情设定表：3×3 九宫格，每格是同一角色从头部到肩部的正面特写，发型与发饰完全一致。九个表情依次为：① 默认（慵懒半眯眼、小嘴）② 安静闭眼 ③ 浅笑（嘴角微扬）④ 开心（笑眼弯成月牙、张嘴笑）⑤ 惊讶（睁圆眼、小圆嘴）⑥ 害羞（满脸红晕、目光躲闪）⑦ 生气（鼓起腮帮、皱眉）⑧ 委屈（眼含泪光、嘴角下撇）⑨ 困倦（打哈欠、眼角带泪）。`,
+            en: `Expression sheet: a 3×3 grid, each cell a front-facing head-and-shoulders close-up of the same character with identical hair and hair ornament. The nine expressions in order: 1 default (sleepy half-lidded eyes, small mouth) 2 calm closed eyes 3 faint smile 4 happy (crescent smiling eyes, open-mouth smile) 5 surprised (wide round eyes, small round mouth) 6 shy (deep blush, eyes looking away) 7 angry (puffed cheeks, frown) 8 hurt (teary eyes, mouth turned down) 9 sleepy (yawning, a tear at the corner of the eye).` }] },
+
+    { id: "blink", sec: "setup", name: "眨眼差分", code: "blink", tier: "设定", kind: "edit", n: 2, c: 1, r: 1, W: 1024, H: 1536, file: "blink_half.png / blink_closed.png",
+      use: "待机时随机眨眼：睁 → 半闭 → 闭 → 半闭 → 睁。",
+      note: "上传白底参考图，用工具的局部编辑框选眼睛区域效果最好。如果其他部位有细微变化，把结果发给我，我只取眼部合成回标准立绘，保证逐像素对齐。",
+      v: [
+        { label: "闭眼", zh: `在这张图上只修改眼睛：把双眼改为自然闭合，画成向下弯的柔和弧线，带几根睫毛，保持原有的深棕色蜡笔线条质感。眼睛以外的一切，包括刘海、腮红、发饰、服装、姿势、构图、尺寸和背景，都与原图完全一致，不要重新绘制其他部分。`,
+          en: `Edit only the eyes in this image: make both eyes gently closed, drawn as soft downward-curving lines with a few lashes, keeping the same dark-brown crayon line texture. Everything except the eyes, including the bangs, blush, hair ornament, outfit, pose, composition, size and background, must stay exactly as in the original. Do not redraw anything else.` },
+        { label: "半闭", zh: `在这张图上只修改眼睛：把上眼睑再压低一些，变成快要闭上的半闭眼，只露出下半部分瞳孔，保持原有的深棕色蜡笔线条质感。眼睛以外的一切，包括刘海、腮红、发饰、服装、姿势、构图、尺寸和背景，都与原图完全一致，不要重新绘制其他部分。`,
+          en: `Edit only the eyes in this image: lower the upper eyelids further so the eyes are almost closed, showing only the lower part of the irises, keeping the same dark-brown crayon line texture. Everything except the eyes, including the bangs, blush, hair ornament, outfit, pose, composition, size and background, must stay exactly as in the original. Do not redraw anything else.` }
+      ] },
+
+    { id: "mouth", sec: "setup", name: "说话口型", code: "talk", tier: "设定", optional: true, kind: "edit", n: 1, c: 1, r: 1, W: 1024, H: 1536, file: "talk_open.png",
+      use: "显示对话气泡时，和原图的闭嘴交替播放，约 6–8 帧/秒。",
+      v: [{ zh: `在这张图上只修改嘴巴：改为微微张开、正在说话的小椭圆形嘴，能看到一点点口腔内的深色，保持蜡笔线条质感。嘴巴以外的一切都与原图完全一致，不要重新绘制其他部分。`,
+            en: `Edit only the mouth in this image: make it slightly open as if talking, a small oval with a hint of dark inside, keeping the crayon line texture. Everything except the mouth must stay exactly as in the original. Do not redraw anything else.` }] },
+
+    { id: "icon", sec: "setup", name: "头像图标", code: "icon", tier: "设定", kind: "sheet", n: 1, c: 1, r: 1, W: 1024, H: 1024, file: "icon.png",
+      use: "程序图标、托盘图标、设置窗口头像。导出 256、128、64、32、16 多个尺寸。",
+      spec: { zh: `【输出要求】{bg}；{neg}；方形 1:1（1024×1024）。`, en: `[Output] {bg}; {neg}; square 1:1 (1024×1024).` },
+      v: [{ zh: `绘制该角色的头像图标：正面的头部和少量肩部特写，表情为默认的慵懒半眯眼，橙色大花发饰清晰可见；构图饱满、居中，适合裁成圆形。线条比立绘略粗，细节适度简化，缩小到 32×32 像素时仍能凭橙色长发的轮廓和大花发饰认出她。`,
+            en: `Avatar icon of this character: a front-facing close-up of the head with a little of the shoulders, default sleepy half-lidded expression, the big orange flower ornament clearly visible; a full, centered composition that still works when cropped to a circle. Slightly bolder lines than the full-body art and simplified details, so she is still recognizable at 32×32 px by the orange hair silhouette and the flower.` }] },
+
+    // P0
+    { id: "idle", sec: "p0", name: "待机", code: "idle", tier: "P0", kind: "none", file: "base_transparent.png",
+      use: "默认状态。",
+      engine: "无需生成。直接用透明底图，由程序做呼吸（纵向缩放 1–2%，约 3 秒一个周期），再配合眨眼差分。" },
+
+    { id: "walk", sec: "p0", name: "行走", code: "walk", tier: "P0", kind: "char", n: 4, c: 2, r: 2, W: 1024, H: 1536, anchor: "feet", file: "walk_01–04.png",
+      use: "在任务栏或窗口顶边上左右走动。",
+      note: "朝右行走直接水平镜像。程序的水平位移速度要和步频匹配，避免“滑步”。",
+      v: [{ zh: `行走循环。角色身体转为 3/4 侧面，面朝画面左侧小步行走，双手把书抱在胸前。四帧依次为：① 一只脚向前迈出；② 双脚并拢经过，身体略微上浮；③ 另一只脚向前迈出；④ 双脚并拢经过，身体略微上浮。长裙随步伐轻轻摆动，靴尖从裙摆下交替露出；长发和发饰缎带向身后轻飘；表情保持默认的慵懒半眯眼。`,
+            en: `Walk cycle. She turns to a 3/4 view facing left and walks with small steps, hugging the book to her chest with both hands. The four frames: 1 one foot stepping forward; 2 feet passing together, body slightly raised; 3 the other foot stepping forward; 4 feet passing together, body slightly raised. The long skirt sways gently with each step and the boot tips peek out in turn; her long hair and ribbon streamers drift behind her; keep the default sleepy half-lidded expression.` }] },
+
+    { id: "drag", sec: "p0", name: "被拎起", code: "drag", tier: "P0", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "top", file: "drag_01–02.png",
+      use: "鼠标按住拖动时。",
+      note: "拖动时可以按鼠标水平速度切换左右摆帧，或由程序直接旋转。松手后接“下落”。",
+      v: [{ zh: `被鼠标拎起、悬在空中。角色正面朝向观众，像被拎住后领的小猫一样整个人悬空：双腿并拢自然下垂、靴尖朝下，双手把书护在胸前；长发和裙摆受重力自然垂落，裙摆得体地包住双腿。表情是有点无奈的半眯眼，嘴巴抿成小波浪线，脸颊微红。两帧为钟摆式摆动：① 身体略向左摆 ② 身体略向右摆。不要画出拎着她的手。`,
+            en: `Picked up by the mouse and dangling in the air. She faces the viewer and hangs like a kitten lifted by the scruff: legs together hanging straight down, boot tips pointing down, both hands holding the book to her chest; her hair and skirt fall naturally with gravity, the skirt modestly covering her legs. Expression: slightly resigned half-lidded eyes, a small wavy pressed mouth, light blush. Two frames of a pendulum swing: 1 body tilted slightly left 2 body tilted slightly right. Do not draw the hand holding her.` }] },
+
+    { id: "fall", sec: "p0", name: "下落", code: "fall", tier: "P0", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "air", file: "fall_01.png",
+      use: "松手后，或从窗口边缘掉下时。",
+      note: "程序加一点左右抖动就很生动。提示词已约束裙摆得体覆盖双腿。",
+      v: [{ zh: `从高处下落。角色在半空中，双臂向上张开（一只手仍紧抓着书），长发和发饰缎带被气流吹得向上翻飞；裙摆像小伞一样微微鼓起，但仍得体地覆盖双腿；双腿微微蜷起。表情慌张：眼睛睁圆，嘴巴张成小圆形，额角一滴汗。`,
+            en: `Falling from a height. She is in mid-air, arms flung up (one hand still gripping the book), her long hair and ribbon streamers blown upward by the air; the skirt puffs out slightly like a small umbrella while still modestly covering her legs; legs slightly tucked. Flustered expression: wide round eyes, small round open mouth, a sweat drop at her temple.` }] },
+
+    { id: "land", sec: "p0", name: "落地", code: "land", tier: "P0", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "land_01–02.png",
+      use: "下落接触地面（任务栏）时，播完回到待机。",
+      v: [{ zh: `落地。两帧：① 刚着地的瞬间，膝盖弯曲蹲低，身体被轻微压扁（Q版挤压感），长发和裙摆向两侧散开，双手抱紧书，眼睛紧闭；② 稳住后站直，一只手轻拍裙摆，恢复慵懒表情，嘴角带一点点不满。`,
+            en: `Landing. Two frames: 1 the moment of impact: knees bent in a low crouch, body slightly squashed (chibi squash effect), hair and skirt spreading out to the sides, hugging the book tightly, eyes squeezed shut; 2 standing back up, one hand lightly brushing off her skirt, back to the sleepy expression with a hint of displeasure.` }] },
+
+    { id: "sit", sec: "p0", name: "坐地看书", code: "sit", tier: "P0", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "ground", file: "sit_01–02.png",
+      use: "闲置一段时间后坐下，可以长时间循环。",
+      v: [{ zh: `坐在地上看书。双腿向一侧收拢侧坐，裙摆在地上铺开成花朵状；书摊开放在膝上，低头阅读，表情平静专注。两帧：① 安静阅读 ② 一只手捏起书页正在翻页。`,
+            en: `Sitting on the ground reading. She sits with her legs folded to one side, the skirt spreading on the ground like a flower; the open book rests on her lap, head bowed as she reads, calm and focused. Two frames: 1 reading quietly 2 one hand lifting a page to turn it.` }] },
+
+    { id: "sleep", sec: "p0", name: "打瞌睡", code: "sleep", tier: "P0", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "ground", file: "sleep_01–02.png",
+      use: "长时间无操作，或深夜时段。",
+      note: "Zzz 用特效素材单独叠加，可以上浮淡出。",
+      v: [{ zh: `坐着打瞌睡。角色坐在地上，背微微弓起，头歪向一侧，双眼闭着，嘴巴微张；摊开的书滑落在膝上，长发自然铺在地面。两帧为呼吸起伏：② 比 ① 的头和肩膀略低一点点。不要画“Z”字符号。`,
+            en: `Dozing off while sitting. She sits on the ground, back slightly curved, head tilted to one side, eyes closed, mouth slightly open; the open book has slid onto her lap and her long hair spreads on the ground. Two frames for breathing: in frame 2 her head and shoulders are a tiny bit lower than in frame 1. Do not draw any "Z" symbols.` }] },
+
+    { id: "poke", sec: "p0", name: "被戳", code: "poke", tier: "P0", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "feet", file: "poke_01.png",
+      use: "单击角色身体。",
+      note: "配合原图里提取的惊觉短线特效。连续点击可以切到 P1 的“生气”。",
+      v: [{ zh: `被戳了一下。身体一缩，双肩耸起，眼睛瞬间睁圆，头发和发饰缎带微微弹起，双手抱紧书；表情是吓了一跳，又带着一点“干什么呀”的不满。不要画感叹号。`,
+            en: `Just got poked. She flinches with her shoulders raised, eyes suddenly wide, hair and ribbon streamers bouncing up a little, hugging the book tightly; startled, with a hint of "what was that for" annoyance. Do not draw an exclamation mark.` }] },
+
+    { id: "pat", sec: "p0", name: "摸头", code: "pat", tier: "P0", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "pat_01–02.png",
+      use: "鼠标在头顶来回移动，或长按头部。",
+      note: "可以叠加小花、爱心特效。",
+      v: [{ zh: `被摸头。微微低头，头向一侧轻歪，双眼舒服地眯成弯弧，脸颊泛红，嘴角带一点藏不住的笑意，双手把书抱在胸前；头顶上方留出空间。两帧：头部轻轻向左、向右蹭动。不要画出摸头的手。`,
+            en: `Getting a head pat. She lowers her head slightly and tilts it to one side, eyes closed into contented curves, cheeks flushed, a small smile she can't quite hide, hugging the book to her chest; leave space above her head. Two frames: her head nuzzling slightly left, then slightly right. Do not draw the patting hand.` }] },
+
+    // P1
+    { id: "read", sec: "p1", name: "站着看书", code: "read", tier: "P1", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "read_01–02.png",
+      use: "待机变体，随机穿插。",
+      v: [{ zh: `站着专心看书。双手捧着摊开的书，低头阅读，目光向下，表情平静。两帧：① 安静阅读 ② 一只手翻动书页，书页微微扬起。`,
+            en: `Reading while standing. She holds the open book with both hands, head bowed, eyes looking down, calm. Two frames: 1 reading quietly 2 one hand turning a page, the page lifting slightly.` }] },
+
+    { id: "tea", sec: "p1", name: "下午茶", code: "tea", tier: "P1", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "tea_01–02.png",
+      use: "待机变体，也可以配合喝水提醒。",
+      v: [{ zh: `喝下午茶。书夹在腋下，一只手托着米白色、带橙色小花纹的茶碟，另一只手端着同款茶杯。两帧：① 闭眼小口啜饮 ② 放下茶杯，满足地轻轻呼气，杯口飘出一缕小热气。`,
+            en: `Afternoon tea. The book is tucked under one arm; one hand holds a cream saucer with small orange flower patterns, the other a matching teacup. Two frames: 1 eyes closed, taking a small sip 2 lowering the cup with a contented little sigh, a wisp of steam rising from the cup.` }] },
+
+    { id: "yawn", sec: "p1", name: "哈欠与伸懒腰", code: "yawn", tier: "P1", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "yawn_01–02.png",
+      use: "入睡前的过渡，或久坐提醒。",
+      v: [{ zh: `犯困。两帧：① 打哈欠，一只手捂着嘴，眼睛眯起，眼角挂着小泪珠，书夹在腋下；② 伸懒腰，双臂向上伸直，把书举过头顶，身体微微后仰，眼睛紧闭。`,
+            en: `Getting sleepy. Two frames: 1 yawning: one hand covering her mouth, eyes squinting, a small tear at the corner of the eye, book tucked under her arm; 2 stretching: both arms straight up holding the book above her head, leaning back slightly, eyes shut.` }] },
+
+    { id: "curtsy", sec: "p1", name: "提裙礼", code: "curtsy", tier: "P1", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "curtsy_01–02.png",
+      use: "启动时登场问候，退出时告别。",
+      note: "和原图一致：书在右手，左手提裙。",
+      v: [{ zh: `优雅的提裙礼。右手把书轻贴在胸前，左手轻轻提起一侧裙摆，一只脚向后交叉，屈膝欠身，微微低头，闭眼浅笑。两帧：① 站直、刚提起裙摆 ② 欠身到最低处。`,
+            en: `An elegant curtsy. Her right hand holds the book lightly against her chest, her left hand lifts one side of the skirt a little, one foot crossed behind the other, knees bent in a small bow, head slightly lowered, eyes closed with a faint smile. Two frames: 1 standing straight, just lifting the skirt 2 at the lowest point of the curtsy.` }] },
+
+    { id: "wave", sec: "p1", name: "挥手", code: "wave", tier: "P1", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "wave_01–02.png",
+      use: "早安、午安等问候，或鼠标靠近时。",
+      v: [{ zh: `挥手打招呼。右手把书抱在胸前，左手举到脸侧轻轻挥动，表情是淡淡的微笑（保持慵懒的气质，不要夸张）。两帧：手掌分别偏左、偏右。`,
+            en: `Waving hello. Her right arm hugs the book to her chest, her left hand raised beside her face, waving gently; a faint smile that keeps her sleepy, low-key personality. Two frames: palm tilted left, then right.` }] },
+
+    { id: "think", sec: "p1", name: "思考", code: "think", tier: "P1", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "feet", file: "think_01.png",
+      use: "等待、加载，或回答问题之前。",
+      v: [{ zh: `思考。一只手的食指抵着下巴，另一只手抱着书，眼睛望向斜上方，嘴巴微微嘟起，头稍稍歪向一边。不要画问号。`,
+            en: `Thinking. One index finger on her chin, the other arm holding the book, eyes looking up to the side, lips slightly pursed, head tilted a little. Do not draw a question mark.` }] },
+
+    { id: "happy", sec: "p1", name: "开心", code: "happy", tier: "P1", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "bounce", file: "happy_01–02.png",
+      use: "完成任务、被夸奖、节日。",
+      v: [{ zh: `开心。双手把书紧紧抱在胸前，眼睛笑成两道弯月，张嘴笑，脸颊红扑扑。两帧为一次小小的弹跳：① 踮脚，身体略微离地 ② 落回站立。`,
+            en: `Happy. Hugging the book tightly to her chest, eyes curved into crescents, open-mouth smile, rosy cheeks. Two frames of a small bounce: 1 on tiptoe, slightly off the ground 2 landing back to standing.` }] },
+
+    { id: "angry", sec: "p1", name: "生气", code: "angry", tier: "P1", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "feet", file: "angry_01.png",
+      use: "连续点击，或拖拽太久。",
+      v: [{ zh: `生气（可爱的那种）。鼓起腮帮、皱起眉，半眯的眼睛带着嫌弃，双手把书举到胸前，作势要用书轻轻敲人。不要画生气符号。`,
+            en: `Angry in a cute way. Puffed cheeks, frowning, half-lidded eyes full of disapproval, holding the book up in front of her chest as if about to give a light bonk with it. Do not draw an anger mark.` }] },
+
+    { id: "shy", sec: "p1", name: "害羞", code: "shy", tier: "P1", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "feet", file: "shy_01.png",
+      use: "被摸头太久、被夸奖。",
+      v: [{ zh: `害羞。用打开的书挡住下半张脸，只露出眼睛，满脸通红，目光向一侧躲闪，肩膀微微缩起。`,
+            en: `Shy. She hides the lower half of her face behind the open book so only her eyes show, face bright red, eyes glancing away to the side, shoulders drawn in.` }] },
+
+    { id: "sad", sec: "p1", name: "委屈", code: "sad", tier: "P1", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "feet", file: "sad_01.png",
+      use: "被冷落太久，或提醒被忽略。",
+      v: [{ zh: `委屈。双手紧紧抱着书，眼眶含泪（泪珠在眼角将落未落），嘴角下撇，眉毛呈八字，身体微微缩起。`,
+            en: `Hurt and teary. Hugging the book tightly with both hands, eyes brimming with tears (a tear about to fall at the corner), mouth turned down, eyebrows slanted up in the middle, body drawn in.` }] },
+
+    { id: "dizzy", sec: "p1", name: "晕眩", code: "dizzy", tier: "P1", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "dizzy_01–02.png",
+      use: "被快速来回拖动之后落地时。",
+      v: [{ zh: `被晃晕了。眼睛变成漩涡状，脸颊发红，身体歪歪斜斜站不稳，头发略显凌乱，书快要从手里滑落。两帧：身体分别向左、向右摇晃。不要画星星或漩涡特效。`,
+            en: `Dizzy from being shaken. Swirly spiral eyes, flushed cheeks, wobbling unsteadily, hair a little messy, the book about to slip from her hands. Two frames: swaying left, then right. Do not draw stars or swirl effects.` }] },
+
+    { id: "bored", sec: "p1", name: "无聊", code: "bored", tier: "P1", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "ground", file: "bored_01.png",
+      use: "长时间没有互动。",
+      v: [{ zh: `无聊。蹲在地上，长裙自然盖住双腿，一只手抱着膝盖，另一只手的手指在地面上画圈圈，书放在身旁的地上；眼神放空，比平时更慵懒，轻轻叹气。`,
+            en: `Bored. Squatting on the ground with the long skirt draped over her legs, one arm around her knees, the other hand drawing little circles on the floor with a finger, the book lying beside her; a blank look, even sleepier than usual, a small sigh.` }] },
+
+    { id: "hair", sec: "p1", name: "整理发饰", code: "hair", tier: "P1", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1536, anchor: "feet", file: "hair_01.png",
+      use: "待机变体。",
+      v: [{ zh: `整理发饰。书夹在腋下，一只手抬起轻扶头上的橙色大花发饰，头微微偏向发饰那一侧，目光看向斜下方，表情安静。`,
+            en: `Adjusting her hair ornament. The book tucked under one arm, one hand raised to touch the big orange flower ornament, head tilted slightly toward that side, eyes looking down to the side, quiet expression.` }] },
+
+    // P2
+    { id: "edge", sec: "p2", name: "坐在窗口边缘", code: "edge", tier: "P2", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "seat", file: "edge_01–02.png",
+      use: "停在窗口顶边上。",
+      note: "后期记下坐面的纵坐标（臀部底部），程序用它对齐窗口顶边。",
+      v: [{ zh: `坐在一条看不见的水平边缘上（例如窗口顶边）。臀部坐在边缘上，小腿和靴子垂在边缘外侧，长裙自然垂下盖住膝盖；书摊开放在腿上阅读。两帧：两只脚一前一后交替轻轻晃动。不要画出任何椅子、台面或边缘线。`,
+            en: `Sitting on an invisible horizontal edge, such as the top of a window. Her hips rest on the edge, lower legs and boots dangling over it, the long skirt draping down over her knees; the open book lies on her lap as she reads. Two frames: her feet swinging gently, alternating front and back. Do not draw any chair, ledge or edge line.` }] },
+
+    { id: "climb", sec: "p2", name: "攀爬", code: "climb", tier: "P2", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "wall", file: "climb_01–02.png",
+      use: "沿屏幕左右边缘上下爬。",
+      note: "爬右侧边缘时水平镜像。",
+      v: [{ zh: `攀爬屏幕左侧的竖直边缘。角色面朝画面左侧，身体贴着一面看不见的墙（墙在格子最左边），双手扒住墙面，双脚蹬墙；书插在腰后的飘带里；长发向下垂落，裙摆自然垂下；表情认真、略显吃力，额角一滴汗。两帧为交替攀爬：① 左手和右脚在上 ② 右手和左脚在上。不要画出墙壁。`,
+            en: `Climbing the left edge of the screen. She faces left with her body against an invisible wall (the wall is at the far left of each cell), hands gripping the wall and feet pushing against it; the book is tucked into the sash at her back; her long hair hangs down and the skirt drapes naturally; serious, slightly strained expression with a sweat drop. Two frames alternating: 1 left hand and right foot higher 2 right hand and left foot higher. Do not draw the wall.` }] },
+
+    { id: "hang", sec: "p2", name: "悬挂", code: "hang", tier: "P2", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "hang", file: "hang_01–02.png",
+      use: "挂在窗口底边或屏幕顶部。",
+      v: [{ zh: `双手抓着头顶上方一条看不见的水平边缘悬挂。双臂向上伸直，双手握拳抓住边缘，身体悬空，双腿并拢自然下垂，长裙垂落盖住双腿；书插在腰间飘带里；表情平静中带一点无奈。两帧：身体分别向左、向右轻微摆动。不要画出边缘或横杆。`,
+            en: `Hanging by both hands from an invisible horizontal edge above her. Arms stretched straight up, fists gripping the edge, body in the air, legs together hanging down, the long skirt falling over her legs; the book tucked into her waist sash; calm but slightly resigned expression. Two frames: body swinging slightly left, then right. Do not draw the edge or a bar.` }] },
+
+    { id: "peek", sec: "p2", name: "探头", code: "peek", tier: "P2", kind: "char", n: 1, c: 1, r: 1, W: 1024, H: 1024, file: "peek_01.png",
+      use: "藏在屏幕边缘外，偶尔探头看看。",
+      spec: { zh: `【输出要求】被截断的一侧必须正好落在画布左边缘；{bg}；{neg}；方形 1:1（1024×1024）。`, en: `[Output] The cut-off side must sit exactly on the left edge of the canvas; {bg}; {neg}; square 1:1 (1024×1024).` },
+      note: "从右边缘探头时水平镜像。从左边缘探出时，大花发饰正好朝向画面中间。",
+      v: [{ zh: `从画面左边缘探出头来。只露出大半个头部（双眼、刘海和橙色大花发饰都可见）和一只扒着边缘的手，身体其余部分在画布左边缘之外，被画布边缘直接截断；表情好奇，眼睛比平时稍微睁大。`,
+            en: `Peeking in from the left edge of the image. Only most of her head (both eyes, the bangs and the big orange flower visible) and one hand gripping the edge are shown; the rest of her body is beyond the left edge of the canvas and cut off by it; curious expression, eyes a little wider than usual.` }] },
+
+    { id: "sign", sec: "p2", name: "举牌提醒", code: "sign", tier: "P2", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "feet", file: "sign_01–02.png",
+      use: "喝水、休息、日程等提醒，程序在牌面上叠加文字。",
+      note: "生成后记下牌面区域的坐标，供程序排版文字。",
+      v: [{ zh: `举牌提醒。双手把一块空白的米白色小木牌举在胸前偏上的位置（木牌有深棕色蜡笔描边，牌面完全空白，不要任何文字或图案），书夹在腋下；表情认真地看着观众，嘴巴微张，像在提醒什么。两帧：木牌一高一低，轻轻上下晃动。`,
+            en: `Holding up a reminder sign. Both hands raise a small blank cream wooden sign a little above her chest (dark-brown crayon outline, the face of the sign completely blank, no text or pictures), book tucked under her arm; she looks at the viewer earnestly, mouth slightly open as if reminding you of something. Two frames: the sign slightly higher, then slightly lower.` }] },
+
+    { id: "write", sec: "p2", name: "陪你工作", code: "write", tier: "P2", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "ground", file: "write_01–02.png",
+      use: "专注模式、番茄钟计时期间。",
+      v: [{ zh: `坐在地上写东西。侧坐，书摊开放在膝上，右手握一支橙色羽毛笔认真书写，低头专注，嘴巴轻轻抿起。两帧：笔尖位置略有不同（正在书写）。`,
+            en: `Writing while sitting on the ground. Sitting with her legs folded to one side, the open book on her lap, holding an orange quill pen in her right hand and writing carefully, head bowed in focus, lips pressed together. Two frames: the pen tip in slightly different positions as she writes.` }] },
+
+    { id: "run", sec: "p2", name: "小跑", code: "run", tier: "P2", kind: "char", n: 4, c: 2, r: 2, W: 1024, H: 1536, anchor: "bounce", file: "run_01–04.png",
+      use: "追着鼠标跑，或急忙跑开。",
+      note: "朝右时水平镜像。",
+      v: [{ zh: `小跑循环。3/4 侧面，面朝画面左侧，身体前倾，一只手把书夹在腋下，另一只手前后摆动；长发和发饰缎带向后飘得比行走时更高，裙摆随步伐摆动，但得体地覆盖双腿；表情有点着急。四帧依次为：① 一只脚蹬地 ② 腾空，双脚离地 ③ 另一只脚落地 ④ 腾空，双脚离地。`,
+            en: `Running cycle. 3/4 view facing left, leaning forward, one arm holding the book under it and the other swinging; her hair and ribbon streamers fly back higher than when walking, and the skirt swings with each stride while modestly covering her legs; slightly hurried expression. Four frames: 1 one foot pushing off 2 airborne, both feet off the ground 3 the other foot landing 4 airborne, both feet off the ground.` }] },
+
+    { id: "jump", sec: "p2", name: "起跳", code: "jump", tier: "P2", kind: "char", n: 2, c: 2, r: 1, W: 1536, H: 1024, anchor: "bounce", file: "jump_01–02.png",
+      use: "从地面跳上窗口顶边。",
+      v: [{ zh: `起跳。两帧：① 蓄力，屈膝下蹲，双手抱书，身体前倾，眼睛盯着上方 ② 起跳，身体舒展向上，双臂上举（一只手抓着书），双脚离地，长发和裙摆向下飘，裙摆得体地覆盖双腿，表情专注。`,
+            en: `Jumping up. Two frames: 1 wind-up: knees bent in a crouch, hugging the book, leaning forward, eyes fixed upward 2 take-off: body stretching upward, arms raised (one hand holding the book), feet off the ground, hair and skirt trailing downward with the skirt modestly covering her legs, focused expression.` }] },
+
+    // 特效与界面
+    { id: "emotes", sec: "fx", name: "情绪特效表", code: "fx_emotes", tier: "特效", kind: "fx", n: 12, c: 4, r: 3, W: 1536, H: 1024, anchor: "center", file: "fx_emotes.png",
+      use: "叠加在角色头顶附近，做淡入、上浮、弹跳。",
+      note: "惊觉短线和小花已经从原图提取，这张用来补全其余符号；如果新画的风格更统一，也可以整套替换。",
+      v: [{ zh: `绘制一套Q版情绪特效贴纸，4 列 × 3 行，每格一个独立符号，大小相近。依次为：① 惊觉短线（三条放射状短线）② 感叹号 ③ 问号 ④ 省略号 ⑤ Zzz ⑥ 爱心 ⑦ 橙色五瓣小花 ⑧ 闪光小星星 ⑨ 汗滴 ⑩ 生气的十字青筋符号 ⑪ 音符 ⑫ 晕眩漩涡。配色以橙、深棕、米白为主，汗滴可用淡蓝，爱心可用橙粉色。`,
+            en: `A set of chibi emotion effect stickers, 4 columns × 3 rows, one standalone symbol per cell, similar in size. In order: 1 surprise lines (three short radiating strokes) 2 exclamation mark 3 question mark 4 ellipsis 5 Zzz 6 heart 7 small five-petal orange flower 8 small twinkle star 9 sweat drop 10 cross-shaped anger vein mark 11 music note 12 dizzy swirl. Mostly orange, dark brown and cream; the sweat drop may be light blue and the heart orange-pink.` }] },
+
+    { id: "bubbles", sec: "fx", name: "对话气泡", code: "fx_bubbles", tier: "特效", kind: "fx", n: 4, c: 2, r: 2, W: 1024, H: 1024, anchor: "center", file: "fx_bubbles.png",
+      use: "显示台词和提醒。",
+      note: "长短不一的文字用九宫格（9-slice）拉伸：四角不变，四边和中间拉伸。也可以直接由程序画圆角框加深棕描边，颜色见下方色板。",
+      v: [{ zh: `绘制一套空白对话气泡：米白色填充，深棕色蜡笔描线，边角柔和，带一点纸张颗粒感。2 × 2 排列：① 横向圆角矩形对话框，尾巴在下方偏左 ② 云朵形思考气泡，下方带两个小圆点 ③ 小号椭圆气泡 ④ 四角各点缀一朵橙色小花的提示框。所有气泡内部完全空白，不要任何文字。`,
+            en: `A set of blank speech bubbles: cream fill, dark-brown crayon outline, soft corners, a little paper grain. 2 × 2 layout: 1 a wide rounded-rectangle speech bubble with the tail at the lower left 2 a cloud-shaped thought bubble with two small circles below it 3 a small oval bubble 4 a notice box with a small orange flower at each corner. Every bubble is completely blank inside, no text.` }] }
+  ];
+
+  const PALETTE = [
+    ["发色橙", "#F2814B"], ["亮橙", "#FB9A66"], ["米白", "#FDECDD"], ["腮红浅肤", "#F2CAB1"],
+    ["描线深棕", "#5A3228"], ["书本棕", "#724639"], ["裙片黑", "#4A3A36"]
+  ];
+
+  // ---------- state ----------
+  const KEY_S = "pet-prompts-settings-v1", KEY_D = "pet-prompts-done-v1";
+  const DEF = { lang: "zh", lock: "full", bg: "transparent" };
+  function read(key, fallback) {
+    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; }
+  }
+  function write(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) { /* storage unavailable */ } }
+  const state = Object.assign({}, DEF, read(KEY_S, {}));
+  if (!["zh", "en"].includes(state.lang)) state.lang = "zh";
+  if (!["full", "short"].includes(state.lock)) state.lock = "full";
+  if (!["transparent", "white"].includes(state.bg)) state.bg = "transparent";
+  let done = read(KEY_D, {});
+  if (typeof done !== "object" || done === null) done = {};
+
+  // ---------- render ----------
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const tierClass = (t) => t === "P0" ? "t-p0" : t === "P1" ? "t-p1" : "";
+  const anchorLabel = (item) => {
+    if (!item.anchor) return item.id === "peek" ? "左边缘" : "";
+    const a = ANCHOR[item.anchor];
+    return (a.grid || a.single).label;
+  };
+
+  function framesDiagram(item) {
+    if (item.kind === "none") return "";
+    const cellW = item.W / item.c, cellH = item.H / item.r;
+    const ar = (cellW / cellH).toFixed(3);
+    let cells = "";
+    const count = item.kind === "edit" ? 1 : item.c * item.r;
+    for (let i = 1; i <= count; i++) cells += `<span>${item.kind === "edit" ? "改" : i}</span>`;
+    const label = item.kind === "edit" ? "在参考图上局部修改" : `${item.c} 列 × ${item.r} 行，共 ${item.n} 格`;
+    return `<div class="frames" style="--c:${item.kind === "edit" ? 1 : item.c};--ar:${ar}" role="img" aria-label="${label}">${cells}</div>`;
+  }
+
+  function chips(item) {
+    const out = [];
+    if (item.kind === "none") {
+      out.push(["帧数", "1 + 眨眼差分"]);
+    } else if (item.kind === "edit") {
+      out.push(["方式", "局部修改"], ["差分", String(item.v.length)]);
+    } else {
+      out.push(["帧数", String(item.n)]);
+      out.push(["布局", item.n === 1 && item.c === 1 ? "单张" : `${item.c}×${item.r}`]);
+      out.push(["画布", `${item.W}×${item.H}`]);
+      const al = anchorLabel(item);
+      if (al) out.push(["锚点", al]);
+    }
+    return `<dl class="chips">${out.map(([k, v]) => `<div><dt>${esc(k)}</dt><dd>${esc(v)}</dd></div>`).join("")}</dl>`;
+  }
+
+  function cardHTML(item) {
+    const tags = [`<span class="tag ${tierClass(item.tier)}">${esc(item.tier)}</span>`];
+    if (item.optional) tags.push(`<span class="tag t-opt">可选</span>`);
+    let body = "";
+    if (item.kind === "none") {
+      body = `<p class="engine">${esc(item.engine)}</p>`;
+    } else {
+      body = item.v.map((v, i) => `
+        <div class="variant">
+          ${item.v.length > 1 ? `<p class="variant-label">${esc(v.label)}</p>` : ""}
+          <p class="action-text" data-item="${item.id}" data-v="${i}"></p>
+          <div class="row">
+            <button type="button" class="copy" data-item="${item.id}" data-v="${i}">复制提示词</button>
+            <details class="full"><summary>查看完整提示词</summary><pre data-item="${item.id}" data-v="${i}"></pre></details>
+          </div>
+        </div>`).join("");
+    }
+    const foot = item.kind === "none"
+      ? `<div class="card-foot"><span class="seg-label">无需生成</span><code>${esc(item.file)}</code></div>`
+      : `<div class="card-foot"><label class="done-toggle"><input type="checkbox" id="done-${item.id}" data-item="${item.id}">已生成</label><code>${esc(item.file)}</code></div>`;
+    return `
+      <article class="card" id="c-${item.id}">
+        <div class="card-head">
+          <div class="card-title"><h3>${esc(item.name)}</h3><code>${esc(item.code)}</code></div>
+          <div class="tags">${tags.join("")}</div>
+        </div>
+        <p class="use"><span>用途：</span>${esc(item.use)}</p>
+        <div class="spec">${framesDiagram(item)}${chips(item)}</div>
+        ${body}
+        ${item.note ? `<p class="note">${esc(item.note)}</p>` : ""}
+        ${foot}
+      </article>`;
+  }
+
+  const byId = Object.fromEntries(ITEMS.map((it) => [it.id, it]));
+  for (const box of document.querySelectorAll("[data-cards]")) {
+    const sec = box.getAttribute("data-cards");
+    box.innerHTML = ITEMS.filter((it) => it.sec === sec).map(cardHTML).join("");
+  }
+
+  function refreshTexts() {
+    for (const el of document.querySelectorAll(".action-text")) {
+      const item = byId[el.dataset.item], v = item.v[+el.dataset.v];
+      el.textContent = v[state.lang];
+    }
+    for (const el of document.querySelectorAll("pre[data-item]")) {
+      const item = byId[el.dataset.item], v = item.v[+el.dataset.v];
+      el.textContent = compose(item, v, state);
+    }
+  }
+
+  const trackable = ITEMS.filter((it) => it.kind !== "none");
+  function refreshProgress() {
+    let n = 0;
+    for (const it of trackable) {
+      const on = !!done[it.id];
+      if (on) n++;
+      const cb = document.getElementById("done-" + it.id);
+      if (cb) cb.checked = on;
+      const card = document.getElementById("c-" + it.id);
+      if (card) card.classList.toggle("is-done", on);
+    }
+    document.getElementById("done-n").textContent = n;
+    document.getElementById("done-total").textContent = trackable.length;
+    document.getElementById("done-bar").style.width = (trackable.length ? (n / trackable.length) * 100 : 0) + "%";
+    for (const sec of ["setup", "p0", "p1", "p2", "fx"]) {
+      const list = trackable.filter((it) => it.sec === sec);
+      const d = list.filter((it) => done[it.id]).length;
+      for (const el of document.querySelectorAll(`[data-count="${sec}"]`)) el.textContent = `${d}/${list.length}`;
+    }
+  }
+
+  // settings controls
+  for (const name of ["lang", "lock", "bg"]) {
+    const input = document.getElementById(`${name}-${state[name]}`);
+    if (input) input.checked = true;
+    for (const r of document.querySelectorAll(`input[name="${name}"]`)) {
+      r.addEventListener("change", () => {
+        if (!r.checked) return;
+        state[name] = r.value;
+        write(KEY_S, state);
+        refreshTexts();
+      });
+    }
+  }
+
+  // done toggles
+  document.addEventListener("change", (e) => {
+    const t = e.target;
+    if (t.matches && t.matches('.done-toggle input[data-item]')) {
+      if (t.checked) done[t.dataset.item] = true; else delete done[t.dataset.item];
+      write(KEY_D, done);
+      refreshProgress();
+    }
+  });
+
+  // copy
+  function selectNode(el) {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+  function flash(btn, text, ok) {
+    const orig = btn.dataset.label || btn.textContent;
+    btn.dataset.label = orig;
+    btn.textContent = text;
+    btn.classList.toggle("ok", !!ok);
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { btn.textContent = orig; btn.classList.remove("ok"); }, 1800);
+  }
+  document.addEventListener("click", async (e) => {
+    const btn = e.target.closest && e.target.closest("button.copy");
+    if (!btn) return;
+    const item = byId[btn.dataset.item], v = item.v[+btn.dataset.v];
+    const text = compose(item, v, state);
+    try {
+      await navigator.clipboard.writeText(text);
+      flash(btn, "已复制", true);
+    } catch (err) {
+      const pre = btn.parentElement.querySelector("pre");
+      const det = btn.parentElement.querySelector("details");
+      if (det) det.open = true;
+      if (pre) selectNode(pre);
+      flash(btn, "已选中，请手动复制", false);
+    }
+  });
+
+  // reset with in-page confirmation
+  const reset = document.getElementById("reset");
+  let armed = null;
+  reset.addEventListener("click", () => {
+    if (!armed) {
+      reset.textContent = "再点一次确认清空";
+      reset.classList.add("armed");
+      armed = setTimeout(() => { armed = null; reset.textContent = "清空进度"; reset.classList.remove("armed"); }, 3000);
+      return;
+    }
+    clearTimeout(armed); armed = null;
+    done = {};
+    write(KEY_D, done);
+    reset.textContent = "已清空";
+    reset.classList.remove("armed");
+    setTimeout(() => { reset.textContent = "清空进度"; }, 1500);
+    refreshProgress();
+  });
+
+  // palette
+  const sw = document.getElementById("swatches");
+  sw.innerHTML = PALETTE.map(([name, hex]) =>
+    `<button type="button" class="swatch" data-hex="${hex}"><i style="background:${hex}"></i><span>${esc(name)}<code>${hex}</code></span></button>`).join("");
+  sw.addEventListener("click", async (e) => {
+    const b = e.target.closest("button.swatch");
+    if (!b) return;
+    const code = b.querySelector("code");
+    try {
+      await navigator.clipboard.writeText(b.dataset.hex);
+      code.textContent = "已复制";
+    } catch (err) {
+      selectNode(code);
+    }
+    setTimeout(() => { code.textContent = b.dataset.hex; }, 1400);
+  });
+
+  refreshTexts();
+  refreshProgress();
+})();
+</script>
