@@ -121,6 +121,19 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private val bubble = SpeechBubble(context, wm).also { b -> b.onSkip = { VoiceClient.stop() } }
     private var chatInput: ChatInput? = null
     private var flyHop = false
+
+    // interactions answered by the model
+    private val modelReacts get() = Prefs.modelReacts(context) && ChatConfig.isReady(context)
+    private var reactBusy = false
+    private var lastReactAt = -100f
+    private var queuedReaction: Pair<String, List<String>>? = null
+    private var pokeBurst = 0
+    private var landEvent: String? = null
+    private val pokeReaction = Runnable {
+        val n = pokeBurst
+        pokeBurst = 0
+        if (n > 0) react(if (n == 1) "戳了你一下" else "连着戳了你 $n 下", if (n >= 4) Lines.angry else Lines.poke)
+    }
     private var voiceErrorShown = false
     var onOpenSettings: (() -> Unit)? = null
 
@@ -343,7 +356,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
         enter(State.PAT, "pat", 1.5f)
         patStartedAt = clock
         effect("flower", 1.4f)
-        if (Random.nextFloat() < 0.6f) say(Lines.pick(Lines.pat))
+        if (!modelReacts && Random.nextFloat() < 0.6f) say(Lines.pick(Lines.pat))
     }
 
     private fun pickNext() {
@@ -463,14 +476,16 @@ class PetController(private val context: Context, private val wm: WindowManager)
             State.LAND -> {
                 frameIndex = if (t < 0.25f) 0 else 1
                 if (t > dur) {
+                    val event = landEvent
+                    landEvent = null
                     if (dizzyPending) {
                         dizzyPending = false
                         act("dizzy", 3f, true, 2.6f)
                         effect("swirl", 2.4f)
-                        say(Lines.pick(Lines.dizzy))
                     } else {
                         idle()
                     }
+                    if (event != null) react(event, if (event.contains("晃")) Lines.dizzy else Lines.drag)
                 }
             }
             State.SIT -> {
@@ -578,9 +593,10 @@ class PetController(private val context: Context, private val wm: WindowManager)
     /** Shows the first sentence of a chat reply in the bubble; the full text stays in the chat panel. */
     /** Says a whole chat reply in the floating bubble, voiced sentence by sentence when TTS is on. */
     fun speak(text: String) {
-        val parts = Voice.sentences(text.trim()).ifEmpty { listOf(text.trim()) }
-        if (!busy) idle()
-        effect("sparkle", 1.2f)
+        val (emotion, body) = Emotion.parse(text)
+        val clean = body.ifBlank { "……" }
+        val parts = Voice.sentences(clean).ifEmpty { listOf(clean) }
+        if (!busy) showEmotion(emotion)
         bubble.begin()
         if (Voice.enabled(context)) {
             var appended = 0
@@ -602,6 +618,18 @@ class PetController(private val context: Context, private val wm: WindowManager)
             parts.forEach { p -> val sec = p.length / 14f; bubble.append(p, sec); total += sec }
             talkUntil = clock + total
             bubble.finish()
+        }
+    }
+
+    private fun showEmotion(emotion: String?) {
+        when (emotion) {
+            "开心" -> { act("happy", 4f, true, 2.4f); effect("heart", 1.6f) }
+            "害羞" -> { act("shy", 0f, false, 2.8f); effect("heart", 1.4f) }
+            "生气" -> { act("angry", 0f, false, 2.6f); effect("anger", 1.8f) }
+            "委屈", "难过" -> { act("sad", 0f, false, 2.8f); effect("sweat", 1.8f) }
+            "惊讶" -> { enter(State.POKE, "poke", 0f, false, 1.6f); effect("exclaim", 1.4f) }
+            "思考" -> { act("think", 0f, false, 2.6f); effect("question", 1.6f) }
+            else -> { idle(); effect("sparkle", 1.2f) }
         }
     }
 
@@ -676,7 +704,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 ) {
                     handler.removeCallbacks(longPress)
                     enter(State.DRAG, "drag", 0f)
-                    if (Random.nextFloat() < 0.5f) say(Lines.pick(Lines.drag), 2.5f)
+                    if (!modelReacts && Random.nextFloat() < 0.5f) say(Lines.pick(Lines.drag), 2.5f)
                     effect("sweat", 1.5f)
                 }
                 if (state == State.DRAG) {
@@ -706,13 +734,23 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 when (state) {
                     State.DRAG -> {
                         if (shakeCount >= 4) dizzyPending = true
+                        val speed = hypot(dragVx, dragVy)
+                        val height = groundTop - y
+                        landEvent = when {
+                            shakeCount >= 4 -> "把你拎起来使劲晃了好几下，晃得你头晕眼花"
+                            speed > dp(1300f) -> "把你拎起来用力甩了出去"
+                            height > screenH * 0.35f -> "把你拎到很高的地方，然后松手让你掉了下去"
+                            else -> null
+                        }
                         vx = dragVx.coerceIn(-dp(1500f), dp(1500f))
                         vy = (dragVy * 0.5f).coerceIn(-dp(700f), dp(900f))
                         startFall()
                     }
                     State.PAT -> {
+                        val secs = (clock - patStartedAt).roundToInt().coerceAtLeast(1)
                         act("happy", 4f, true, 1.6f)
                         effect("heart", 1.5f)
+                        react("摸了摸你的头，摸了大约 $secs 秒" + if (secs >= 5) "，摸了好久" else "", Lines.pat)
                     }
                     else -> if (e.actionMasked == MotionEvent.ACTION_UP) onTap()
                 }
@@ -723,13 +761,14 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private fun onTap() {
         when (state) {
             State.CLIMB, State.HANG -> {
+                landEvent = if (state == State.CLIMB) "把正在爬墙的你戳了下来" else "把挂在屏幕顶上的你戳了下来"
                 effect("exclaim", 1.2f)
                 startFall()
             }
             State.SLEEP -> {
                 enter(State.POKE, "poke", 0f, false, 1.4f)
                 effect("notice", 1.2f)
-                say(Lines.pick(Lines.wake))
+                react("在你打瞌睡的时候把你叫醒了", Lines.wake)
             }
             State.DRAG, State.FALL, State.FLY -> Unit
             else -> openChatInput()
@@ -743,25 +782,60 @@ class PetController(private val context: Context, private val wm: WindowManager)
             tapCount = 0
         }
         tapCount++
+        pokeBurst++
         when {
             tapCount >= 7 -> {
                 act("sad", 0f, false, 3f)
                 effect("sweat", 2f)
-                say(Lines.pick(Lines.sad))
                 tapCount = 0
             }
             tapCount >= 4 -> {
                 act("angry", 0f, false, 2.4f)
                 effect("anger", 2f)
-                say(Lines.pick(Lines.angry))
             }
             else -> {
                 enter(State.POKE, "poke", 0f, false, 1.0f)
                 effect("notice", 1.0f)
-                if (Random.nextFloat() < 0.5f) say(Lines.pick(Lines.poke), 2.2f)
+            }
+        }
+        handler.removeCallbacks(pokeReaction)
+        handler.postDelayed(pokeReaction, 1100)
+    }
+
+    /**
+     * Something was done to her. With a chat API configured, the model answers in character
+     * (the action goes into the chat history); otherwise a built-in line is used.
+     */
+    private fun react(event: String, fallback: List<String>) {
+        if (!modelReacts) {
+            say(Lines.pick(fallback), 2.6f)
+            return
+        }
+        if (reactBusy || clock - lastReactAt < 2.5f) {
+            queuedReaction = event to fallback
+            return
+        }
+        reactBusy = true
+        lastReactAt = clock
+        val card = CardStore.active(context)
+        val history = ChatStore.load(context, card.id)
+        history.add(Msg("user", ACTION_PREFIX + event))
+        ChatStore.save(context, card.id, history)
+        ChatClient.send(context, card, history) { result ->
+            reactBusy = false
+            result.onSuccess { reply ->
+                val h = ChatStore.load(context, card.id)
+                h.add(Msg("assistant", reply))
+                ChatStore.save(context, card.id, h)
+                speak(reply)
+            }.onFailure { say(Lines.pick(fallback), 2.6f) }
+            queuedReaction?.let { (e, f) ->
+                queuedReaction = null
+                handler.postDelayed({ react(e, f) }, 2600)
             }
         }
     }
+
 }
 
 /** Like coerceIn, but never throws when the range is empty (tiny screens, landscape with a tall keyboard). */

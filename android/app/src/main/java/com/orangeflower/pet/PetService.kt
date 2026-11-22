@@ -144,6 +144,13 @@ object Prefs {
     fun size(context: Context): Float =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getFloat("size", 1f)
 
+    fun modelReacts(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("model_reacts", true)
+
+    fun setModelReacts(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("model_reacts", value).apply()
+    }
+
     fun dodgeKeyboard(context: Context): Boolean =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("dodge_keyboard", true)
 

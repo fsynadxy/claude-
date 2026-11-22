@@ -220,7 +220,7 @@ class MainActivity : Activity() {
             testResult.text = "正在问她……"
             val card = CardStore.active(this)
             ChatClient.send(this, card, listOf(Msg("user", "用一句话跟我打个招呼吧。"))) { r ->
-                testResult.text = r.fold({ "连上了。「${card.name}」说：$it" }, { "没连上：${it.message}" })
+                testResult.text = r.fold({ "连上了。「${card.name}」说：${Emotion.strip(it)}" }, { "没连上：${it.message}" })
             }
         }, LinearLayout.LayoutParams(0, dp(42), 1f))
         root.addView(chatButtons, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(10) })
@@ -240,6 +240,18 @@ class MainActivity : Activity() {
             isChecked = Prefs.dodgeKeyboard(this@MainActivity)
             setOnCheckedChangeListener { _, on -> Prefs.setDodgeKeyboard(this@MainActivity, on) }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(Switch(this).apply {
+            text = "摸头、戳、拎起来甩等互动交给模型回应"
+            textSize = 14f
+            setTextColor(ink)
+            isChecked = Prefs.modelReacts(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> Prefs.setModelReacts(this@MainActivity, on) }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(TextView(this).apply {
+            text = "开启后，你对她做的事会作为一条“互动”发给当前角色卡，由模型按角色性格回应（每次约一句话的额度）；没填 API 时用内置台词。"
+            textSize = 12f
+            setTextColor(muted)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
         root.addView(Switch(this).apply {
             text = "朗读她的回复（离线语音）"
             textSize = 14f
@@ -285,7 +297,8 @@ class MainActivity : Activity() {
                 "怎么和她相处",
                 "· 单击：她头顶会弹出输入框，和她聊天；输入框开着时再点她是戳她，连着戳会生气",
                 "· 输入框右边的 ⤢ 可以打开完整的聊天记录",
-                "· 长按：摸摸头，摸久了会害羞",
+                "· 长按：摸摸头，摸久了会害羞；摸头、戳、甩她都会由模型按角色性格回应",
+                "· 她的表情会跟着回复内容变化（开心、害羞、生气、委屈、惊讶、思考）",
                 "· 拖动：把她拎起来，松手会掉下去；使劲晃会晕",
                 "· 不理她时：她会散步、看书、喝茶、坐下打瞌睡，偶尔爬上屏幕边缘",
                 "· 键盘弹出时：她会零档起飞，挂到屏幕顶上让开，键盘收起后再落回来",

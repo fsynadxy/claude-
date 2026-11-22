@@ -168,7 +168,14 @@ class ChatActivity : Activity() {
         if (history.isEmpty() && card.greeting.isNotBlank()) {
             addBubble(card.greeting.replace("{{user}}", ChatConfig.userName(this)), mine = false)
         }
-        history.forEach { addBubble(it.content, mine = it.role == "user") }
+        history.forEach {
+            when {
+                it.role == "user" && it.content.startsWith(ACTION_PREFIX) ->
+                    addBubble("（你" + it.content.removePrefix(ACTION_PREFIX) + "）", mine = true, note = true)
+                it.role == "user" -> addBubble(it.content, mine = true)
+                else -> addBubble(Emotion.strip(it.content), mine = false)
+            }
+        }
         if (waiting) pending = addBubble("……", mine = false, note = true)
         scrollToEnd()
     }
@@ -225,7 +232,7 @@ class ChatActivity : Activity() {
                 PetService.speak(reply)
                 if (!isDestroyed && card.id == cardNow.id) {
                     history = h
-                    pending?.let { it.text = reply; it.setTextColor(ink) }
+                    pending?.let { it.text = Emotion.strip(reply); it.setTextColor(ink) }
                     pending = null
                 }
             }.onFailure { e ->

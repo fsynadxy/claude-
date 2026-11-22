@@ -96,6 +96,20 @@ object ChatConfig {
 
 data class Msg(val role: String, val content: String)
 
+/** Expression tag the model puts at the start of a reply, e.g. 【开心】. */
+object Emotion {
+    private val tag = Regex("[【\\[](开心|害羞|生气|委屈|难过|惊讶|思考|平静)[】\\]]")
+
+    /** Returns (emotion or null, text without tags). */
+    fun parse(text: String): Pair<String?, String> = tag.find(text)?.groupValues?.get(1) to strip(text)
+
+    fun strip(text: String) = tag.replace(text, "").trim()
+}
+
+/** User-side messages that describe what was done to the pet rather than said. */
+const val ACTION_PREFIX = "【互动】"
+
+
 /** Per-card chat history, newest last. */
 object ChatStore {
     private const val KEEP = 40
@@ -131,7 +145,11 @@ object ChatClient {
     private const val PET_NOTE =
         "【桌宠说明】你现在住在{{user}}的手机屏幕上，是一个Q版桌宠。你的回复会先显示在头顶的小气泡里，" +
             "完整内容显示在聊天窗口。平时用一到三句自然口语回答；除非对方要求，不要长篇大论；" +
-            "不要使用 Markdown、标题或列表符号。"
+            "不要使用 Markdown、标题或列表符号。" +
+            "\n每次回复的最开头，用一个标签标出你此刻的表情，只能从【开心】【害羞】【生气】【委屈】【惊讶】【思考】【平静】里选一个，" +
+            "例如：【开心】嘿嘿，谢谢。标签只在开头出现一次。" +
+            "\n当{{user}}的消息以【互动】开头时，表示{{user}}在屏幕上对你做了这个动作，而不是在说话。" +
+            "用一两句简短、符合你性格的反应回应，不要复述动作本身。"
 
     fun systemPrompt(c: Context, card: Card): String {
         val user = ChatConfig.userName(c)

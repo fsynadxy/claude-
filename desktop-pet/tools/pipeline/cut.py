@@ -30,7 +30,9 @@ def cutout(rgb, protect=None, dark_thr=170, white_thr=238, ring_thr=0.6, zone_r=
             full[s[0].start-y0:s[0].stop-y0, s[1].start-x0:s[1].stop-x0] = comp
             ring = ndi.binary_dilation(full, disk(4)) & ~full
             if (mn[y0:y1, x0:x1][ring] < dark_thr).mean() >= ring_thr:
-                if protect is not None and protect[y0:y1, x0:x1][full].any(): continue
+                if protect is not None:
+                    ys_, xs_ = np.nonzero(full)
+                    if protect[y0 + int(ys_.mean()), x0 + int(xs_.mean())]: continue   # centre in a face zone: eye white
                 holes[y0:y1, x0:x1] |= full
     bg = outside | holes
     zone = ndi.binary_dilation(bg, disk(zone_r))

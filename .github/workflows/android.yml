@@ -34,14 +34,18 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleRelease
 
+      - name: Read version
+        id: ver
+        run: echo "version=$(grep -oP 'val appVersion = "\K[^"]+' app/build.gradle.kts)" >> "$GITHUB_OUTPUT"
+
       - name: Name the APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/ClauNiang-1.0.${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/ClauNiang-${{ steps.ver.outputs.version }}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: ClauNiang-1.0.${{ github.run_number }}
+          name: ClauNiang-${{ steps.ver.outputs.version }}-build${{ github.run_number }}
           path: android/dist/*.apk
           if-no-files-found: error
 
@@ -51,9 +55,9 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release]')
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v{0}', steps.ver.outputs.version) }}
           target_commitish: ${{ github.sha }}
-          name: Clau娘 1.0.${{ github.run_number }}
+          name: Clau娘 ${{ steps.ver.outputs.version }}
           make_latest: true
           body: |
             在手机上点下面的 APK 下载安装（需要允许安装未知来源应用）。

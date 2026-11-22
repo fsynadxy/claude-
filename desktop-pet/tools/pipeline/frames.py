@@ -40,6 +40,14 @@ def load_cells(name, cfg):
     fg, a = cut.cutout(rgb)
     H, W = a.shape
     c, r = cfg['grid']
+    # second pass: keep enclosed white areas inside each character's face zone (eye whites)
+    protect = np.zeros((H, W), bool)
+    lab0, comps0 = cut.components(a, min_px=int(H * W * 0.002))
+    for cid, size, sl in comps0:
+        y0, y1, x0, x1 = sl[0].start, sl[0].stop, sl[1].start, sl[1].stop
+        h, w = y1 - y0, x1 - x0
+        protect[y0 + int(h * 0.17): y0 + int(h * 0.38), x0 + int(w * 0.33): x0 + int(w * 0.67)] = True
+    fg, a = cut.cutout(rgb, protect=protect)
     lab, comps = cut.components(a, min_px=int(H * W * 0.00004))
     cells = {i: np.zeros((H, W), bool) for i in range(c * r)}
     for cid, size, s in comps:

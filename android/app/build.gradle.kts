@@ -6,6 +6,8 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// Shown version; CI reads it for the APK name and the release tag.
+val appVersion = "1.1.0"
 // CI run number becomes the version code, so each new APK installs over the previous one.
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
@@ -60,7 +62,7 @@ android {
         minSdk = 26
         targetSdk = 35
         versionCode = buildNumber
-        versionName = "1.0.$buildNumber"
+        versionName = appVersion
         ndk {
             // practically every phone in use is 64-bit ARM; keeps the speech engine small
             abiFilters += "arm64-v8a"
