@@ -86,7 +86,7 @@ class PetService : Service() {
         )
         val notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_flower)
-            .setContentTitle("橙花少女在屏幕上陪着你")
+            .setContentTitle("Clau娘在屏幕上陪着你")
             .setContentText("点“收起”让她回去休息")
             .setContentIntent(open)
             .setOngoing(true)

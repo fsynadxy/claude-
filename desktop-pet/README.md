@@ -1,4 +1,4 @@
-# 桌宠素材 · 橙花少女
+# 桌宠素材 · Clau娘
 
 ## 提示词
 - 在线页面：https://claude.ai/artifact/FdmhTA5RjqE9NzgQf3DU4o（私有，默认只有你能打开）
@@ -36,5 +36,5 @@ python3 tools/compose.py   # 统一画布，输出白底、透明、贴纸三个
   - `idle.py` 把眨眼、口型配准后只合成脸部，保证与待机帧逐像素对齐
 - 处理结果在 `android/app/src/main/assets/pet/`：640×800 画布，脚底基线 y=780，所有动作帧朝左
 
-## 安卓应用
+## 安卓应用（Clau娘）
 项目在仓库根目录的 `android/`，推送后 GitHub Actions（`.github/workflows/android.yml`）自动编译 APK，在 Actions 页面的 Artifacts 里下载。推送 `v` 开头的标签（如 `v1.0`）时，还会把 APK 发布到 Releases，方便在手机上直接下载。

@@ -60,7 +60,7 @@ class MainActivity : Activity() {
         root.addView(portrait, LinearLayout.LayoutParams(dp(200), dp(250)))
 
         root.addView(TextView(this).apply {
-            text = "橙花少女"
+            text = "Clau娘"
             textSize = 24f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(ink)
@@ -155,7 +155,7 @@ class MainActivity : Activity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         if (!Settings.canDrawOverlays(this)) {
-            Toast.makeText(this, "请在列表里允许“橙花桌宠”显示在其他应用上层", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "请在列表里允许“Clau娘”显示在其他应用上层", Toast.LENGTH_LONG).show()
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             return
         }

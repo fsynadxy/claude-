@@ -31,11 +31,11 @@ jobs:
       - name: Name the APK
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk "dist/OrangePet-1.0.${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "dist/ClauNiang-1.0.${{ github.run_number }}.apk"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: OrangePet-1.0.${{ github.run_number }}
+          name: ClauNiang-1.0.${{ github.run_number }}
           path: android/dist/*.apk
           if-no-files-found: error
 
