@@ -1,0 +1,737 @@
+<title>Clau娘宣传片</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700;900&family=ZCOOL+KuaiLe&display=swap">
+<style>
+/* Layout: one 16:9 white stage (the film itself), with a slim player bar under it. Single light look by design. */
+:root {
+  --page: #F4F0EB;
+  --stage: #FFFFFF;
+  --ink: #3B2620;
+  --muted: #8A766B;
+  --accent: #E0672C;
+  --bar: #FFFFFF;
+  --line: #E7DDD3;
+  --font-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+  color-scheme: light;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--page); color: var(--ink); font-family: var(--font-body); }
+.wrap { max-width: 1280px; margin: 0 auto; padding-block: 20px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 12px; }
+.screen { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; background: var(--stage); border-radius: 14px; overflow: hidden; box-shadow: 0 10px 40px rgba(59, 38, 32, 0.12); }
+canvas { display: block; width: 100%; height: 100%; }
+.play { position: absolute; inset: 0; display: grid; place-items: center; background: transparent; border: 0; cursor: pointer; }
+.play span { width: 84px; height: 84px; border-radius: 50%; background: var(--accent); display: grid; place-items: center; box-shadow: 0 8px 24px rgba(224, 103, 44, 0.35); transition: transform .15s; }
+.play:hover span, .play:focus-visible span { transform: scale(1.06); }
+.play:focus-visible { outline: none; }
+.play svg { margin-left: 6px; }
+.bar { display: flex; align-items: center; gap: 12px; background: var(--bar); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; }
+.bar button { appearance: none; border: 0; background: none; color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; padding: 6px 8px; border-radius: 8px; white-space: nowrap; }
+.bar button:hover { background: var(--page); }
+.bar button:focus-visible, #seek:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#seek { flex: 1; min-width: 0; accent-color: var(--accent); }
+.time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.note { font-size: 13px; color: var(--muted); }
+body.export .wrap { padding: 0; max-width: none; }
+body.export .bar, body.export .note, body.export .play { display: none; }
+body.export .screen { border-radius: 0; box-shadow: none; width: 1920px; height: 1080px; }
+</style>
+
+<div class="wrap">
+  <div class="screen">
+    <canvas id="c" width="1920" height="1080" aria-label="Clau娘宣传动画"></canvas>
+    <button class="play" id="bigplay" aria-label="播放"><span><svg width="34" height="38" viewBox="0 0 34 38" aria-hidden="true"><path d="M2 2 L32 19 L2 36 Z" fill="#FFFFFF"/></svg></span></button>
+  </div>
+  <div class="bar">
+    <button id="toggle" type="button">播放</button>
+    <input id="seek" type="range" min="0" max="63" step="0.01" value="3" aria-label="进度">
+    <span class="time" id="time">0:03 / 1:03</span>
+    <button id="replay" type="button">从头播放</button>
+  </div>
+  <p class="note">有声音（离线语音合成的台词）。动画全部由代码实时绘制，人物来自 App 里的同一套帧。</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const W = 1920, H = 1080, DURATION = 63;
+  const cv = document.getElementById("c");
+  const ctx = cv.getContext("2d");
+  const exportMode = location.search.indexOf("export") >= 0;
+  if (exportMode) document.body.classList.add("export");
+
+  // ---------------------------------------------------------------- palette & fonts
+  const C = {
+    ink: "#3B2620", muted: "#8A766B", accent: "#E0672C", accentSoft: "#FCE6D8",
+    bubble: "rgba(43,33,29,0.95)", bubbleLine: "#F3E2D2", bubbleText: "#FFF8F0",
+    bezel: "#2B211D", line: "#E7DDD3",
+  };
+  const BODY = '"Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif';
+  const DISPLAY = '"ZCOOL KuaiLe", "Noto Sans SC", sans-serif';
+
+  // ---------------------------------------------------------------- assets
+  const SETS = {
+    idle: 1, blink: 2, talk: 2, poke: 1, drag: 1, fall: 1, think: 1, shy: 1, angry: 1, sad: 1,
+    walk: 8, tea: 4, pat: 4, land: 4, dizzy: 4, happy: 4, fly: 4, hang: 2, wave: 4, curtsy: 4,
+  };
+  const FX = ["notice", "heart", "flower", "sweat", "swirl", "dots", "question", "anger", "sparkle", "exclaim", "music"];
+  const img = {};
+  const loads = [];
+  function load(key, src) {
+    const im = new Image();
+    loads.push(new Promise((res) => { im.onload = res; im.onerror = res; }));
+    im.src = src;
+    img[key] = im;
+  }
+  for (const [name, n] of Object.entries(SETS)) {
+    for (let i = 1; i <= n; i++) load(`${name}_${i}`, `assets/${name}_${String(i).padStart(2, "0")}.webp`);
+  }
+  for (const f of FX) load("fx_" + f, `assets/fx_${f}.webp`);
+  load("avatar", "assets/avatar.webp");
+
+  // voice lines: [start, duration, text]
+  const VOICE = {
+    v0: [1.4, 3.02, "你好，我是 Claude。现在，住在你的屏幕上。"],
+    v1: [15.8, 2.48, "这么久啊，花都要被你摸歪了。"],
+    v2: [26.3, 4.03, "辛苦了，能一口气收尾真不容易。是哪里出的问题？"],
+    v3: [37.1, 0.69, "起飞！"],
+    v4: [46.5, 3.51, "这是在写周报吧？第三条可以再具体一点。"],
+    v5: [59.4, 2.15, "有空的话，来找我聊聊吧。"],
+  };
+  const audio = {};
+  if (!exportMode) for (const k of Object.keys(VOICE)) { const a = new Audio(`audio/${k}.mp3`); a.preload = "auto"; audio[k] = a; }
+
+  // ---------------------------------------------------------------- math
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const prog = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+  const inOut = (k) => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+  const outCubic = (k) => 1 - Math.pow(1 - k, 3);
+  const inCubic = (k) => k * k * k;
+  const outBack = (k) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+  const between = (t, a, b) => t >= a && t < b;
+  const loopIdx = (t, t0, fps) => Math.max(0, Math.floor((t - t0) * fps));
+  const onceIdx = (t, t0, fps, n) => Math.min(n - 1, Math.max(0, Math.floor((t - t0) * fps)));
+
+  // ---------------------------------------------------------------- layout
+  const PHONE = { x: 1050, y: 60, w: 500, h: 960, r: 72 };
+  const SCR = { x: 1066, y: 76, w: 468, h: 928, r: 58 };
+  const GROUND = SCR.y + SCR.h - 44;
+  const PS = 0.36;                       // pet scale inside the phone
+  const BIG = { x: 960, y: 850, s: 0.78 };
+  const CX = SCR.x + SCR.w / 2;
+  const HANG_Y = SCR.y + 44 + 780 * PS;   // feet line that puts her hands at the top of the screen
+
+  // ---------------------------------------------------------------- the pet over time
+  function pet(t) {
+    const p = { anim: "idle", i: 0, x: CX, y: GROUND, s: PS, flip: false, rot: 0, pivot: 0.975, alpha: 1, pop: 1, talk: false };
+    const talking = (k) => between(t, VOICE[k][0], VOICE[k][0] + VOICE[k][1]);
+    // intro
+    if (t < 5.3) {
+      Object.assign(p, { x: BIG.x, y: BIG.y, s: BIG.s });
+      if (between(t, 0.35, 1.5)) { p.anim = "curtsy"; p.i = onceIdx(t, 0.35, 3.6, 4); }
+      p.alpha = outCubic(prog(t, 0, 0.5));
+      p.talk = talking("v0");
+      return p;
+    }
+    // fly into the phone
+    if (t < 6.4) {
+      const k = inOut(prog(t, 5.3, 6.4));
+      Object.assign(p, { anim: "fly", i: loopIdx(t, 5.3, 9), x: lerp(BIG.x, CX, k), y: lerp(BIG.y, GROUND, k) - Math.sin(k * Math.PI) * 120, s: lerp(BIG.s, PS, k) });
+      return p;
+    }
+    if (t < 6.9) { p.anim = "land"; p.i = onceIdx(t, 6.4, 8, 4); return p; }
+    // daily life: walk left, walk back, tea
+    if (t < 8.4) { p.anim = "walk"; p.i = loopIdx(t, 6.9, 10); p.x = lerp(CX, CX - 130, prog(t, 6.9, 8.4)); return p; }
+    if (t < 8.5) { p.x = CX - 130; return p; }
+    if (t < 10.2) { p.anim = "walk"; p.i = loopIdx(t, 8.5, 10); p.flip = true; p.x = lerp(CX - 130, CX, prog(t, 8.5, 10.2)); return p; }
+    if (t < 12.2) { p.anim = "tea"; p.i = loopIdx(t, 10.3, 1.8) % 4; return p; }
+    // interactions
+    if (between(t, 12.8, 13.6)) { p.anim = "poke"; if (t < 13.15) p.y += Math.sin((t - 12.8) * 60) * 3 * (1 - (t - 12.8) / 0.35); return p; }
+    if (between(t, 14.0, 15.6)) { p.anim = "pat"; p.i = loopIdx(t, 14.0, 5) % 4; p.rot = 1.2 * Math.sin(t * 4); return p; }
+    if (between(t, 15.6, 16.9)) { p.anim = "shy"; return p; }
+    if (between(t, 16.9, 18.6)) { p.talk = talking("v1"); return p; }
+    if (between(t, 18.6, 19.9)) {
+      const lift = outCubic(prog(t, 18.6, 18.9));
+      const sx = between(t, 18.9, 19.8) ? Math.sin((t - 18.9) * 18) * 70 * Math.sin(prog(t, 18.9, 19.8) * Math.PI) : 0;
+      const vx = between(t, 18.9, 19.8) ? Math.cos((t - 18.9) * 18) * 18 * 70 : 0;
+      Object.assign(p, { anim: "drag", x: CX + sx, y: GROUND - 140 * lift, rot: clamp(-vx / 900 * 16, -16, 16), pivot: 0.17 });
+      return p;
+    }
+    if (between(t, 19.9, 20.25)) { p.anim = "fall"; p.y = lerp(GROUND - 140, GROUND, inCubic(prog(t, 19.9, 20.25))); return p; }
+    if (between(t, 20.25, 20.8)) { p.anim = "land"; p.i = onceIdx(t, 20.25, 7.5, 4); return p; }
+    if (between(t, 20.8, 22.0)) { p.anim = "dizzy"; p.i = loopIdx(t, 20.8, 5) % 4; p.rot = 3 * Math.sin((t - 20.8) * 5 * Math.PI / 2); return p; }
+    // chat
+    if (between(t, 22.6, 22.95)) { p.anim = "poke"; return p; }
+    if (between(t, 25.1, 26.2)) { p.anim = "think"; return p; }
+    if (between(t, 26.2, 27.4)) { p.anim = "happy"; p.i = loopIdx(t, 26.2, 8) % 4; return p; }
+    if (t < 31.0) { p.talk = talking("v2"); return p; }
+    // expressions
+    if (t < 36.0) {
+      const steps = [[31.3, "happy"], [32.2, "shy"], [33.1, "angry"], [34.0, "sad"], [34.9, "think"]];
+      let cur = null;
+      for (const s of steps) if (t >= s[0]) cur = s;
+      if (cur) {
+        p.anim = cur[1];
+        if (cur[1] === "happy") p.i = loopIdx(t, cur[0], 8) % 4;
+        p.pop = 1 + 0.06 * Math.sin(prog(t, cur[0], cur[0] + 0.25) * Math.PI);
+      }
+      return p;
+    }
+    // keyboard takeoff
+    if (between(t, 36.95, 37.1)) { p.anim = "land"; p.i = 0; return p; }
+    if (between(t, 37.1, 37.55)) { p.anim = "fly"; p.i = loopIdx(t, 37.1, 10) % 4; p.y = lerp(GROUND, HANG_Y, inCubic(prog(t, 37.1, 37.55))); return p; }
+    if (between(t, 37.55, 40.9)) {
+      const sw = Math.sin((t - 37.55) * 2.4);
+      Object.assign(p, { anim: "hang", i: sw < 0 ? 0 : 1, y: HANG_Y, rot: 6 * sw * Math.min(1, (t - 37.55) * 2), pivot: 0.05 });
+      return p;
+    }
+    if (between(t, 40.9, 41.35)) { p.anim = "fall"; p.y = lerp(HANG_Y, GROUND, inCubic(prog(t, 40.9, 41.35))); return p; }
+    if (between(t, 41.35, 41.9)) { p.anim = "land"; p.i = onceIdx(t, 41.35, 7.5, 4); return p; }
+    // look at the screen
+    if (between(t, 43.3, 43.9)) { p.anim = "poke"; return p; }
+    if (between(t, 43.9, 45.6)) { p.alpha = 1 - prog(t, 43.9, 44.15); p.pop = lerp(1, 0.7, prog(t, 43.9, 44.15)); return p; }
+    if (between(t, 45.6, 46.5)) { p.anim = "think"; p.pop = outBack(prog(t, 45.6, 45.9)); p.alpha = prog(t, 45.6, 45.75); return p; }
+    if (t < 50.6) { p.talk = talking("v4"); return p; }
+    // character cards: wave
+    if (t < 53.4) { if (t > 50.8) { p.anim = "wave"; p.i = loopIdx(t, 50.8, 6) % 4; } return p; }
+    if (t < 56.0) return p;
+    // back to the centre
+    if (t < 57.2) {
+      const k = inOut(prog(t, 56.0, 57.2));
+      Object.assign(p, { anim: "fly", i: loopIdx(t, 56, 9) % 4, x: lerp(CX, BIG.x, k), y: lerp(GROUND, BIG.y, k) - Math.sin(k * Math.PI) * 140, s: lerp(PS, BIG.s, k) });
+      return p;
+    }
+    Object.assign(p, { x: BIG.x, y: BIG.y, s: BIG.s });
+    if (t < 57.7) { p.anim = "land"; p.i = onceIdx(t, 57.2, 8, 4); return p; }
+    if (between(t, 57.8, 59.2)) { p.anim = "curtsy"; p.i = onceIdx(t, 57.8, 3.2, 4); return p; }
+    p.talk = talking("v5");
+    return p;
+  }
+
+  function drawPet(t) {
+    const p = pet(t);
+    if (p.alpha <= 0.01) return p;
+    let key = `${p.anim}_${(p.i % SETS[p.anim]) + 1}`;
+    if (p.anim === "idle") {
+      if (p.talk) {
+        const m = Math.floor(t * 11) % 4;
+        key = m === 2 ? "talk_1" : m === 0 ? "idle_1" : "talk_2";
+      } else {
+        const b = (t * 1000 % 3700) / 1000;           // blink every 3.7 s
+        if (b < 0.06 || between(b, 0.16, 0.22)) key = "blink_1";
+        else if (b < 0.16) key = "blink_2";
+      }
+    }
+    const im = img[key];
+    if (!im || !im.width) return p;
+    const s = p.s * p.pop;
+    const breath = p.anim === "idle" && !p.talk ? 0.008 * Math.sin(t * 2 * Math.PI / 3.2) : 0;
+    ctx.save();
+    ctx.globalAlpha = p.alpha;
+    ctx.translate(p.x, p.y);
+    if (p.rot) {
+      const py = -780 * p.s + 800 * p.s * p.pivot;
+      ctx.translate(0, py); ctx.rotate(p.rot * Math.PI / 180); ctx.translate(0, -py);
+    }
+    ctx.scale((p.flip ? -1 : 1) * s * (1 - breath * 0.5), s * (1 + breath));
+    ctx.drawImage(im, -320, -780, 640, 800);
+    ctx.restore();
+    return p;
+  }
+
+  // ---------------------------------------------------------------- effects above her head
+  const FXEV = [
+    [12.82, "notice", 0.9], [14.3, "heart", 1.2], [15.0, "flower", 1.2], [20.85, "swirl", 1.3],
+    [22.62, "notice", 0.6], [25.15, "dots", 1.1], [26.25, "heart", 1.3], [32.2, "heart", 0.8], [33.1, "anger", 0.8],
+    [34.0, "sweat", 0.8], [34.9, "question", 1.0], [36.85, "exclaim", 0.8], [43.3, "notice", 0.5], [45.65, "dots", 0.9],
+    [46.5, "sparkle", 1.0], [51.0, "music", 1.4], [59.4, "sparkle", 1.2],
+  ];
+  function drawFx(t, p) {
+    for (const [t0, name, dur] of FXEV) {
+      if (t < t0 || t > t0 + dur) continue;
+      const im = img["fx_" + name]; if (!im || !im.width) continue;
+      const age = (t - t0) / dur;
+      const pop = age < 0.15 ? 0.6 + age / 0.15 * 0.4 : 1;
+      const a = age > 0.75 ? (1 - age) / 0.25 : 1;
+      const size = 800 * p.s * 0.13 * pop;
+      const k = size / Math.max(im.width, im.height);
+      const fx = p.x + 640 * p.s * 0.22, fy = p.y - 780 * p.s + 800 * p.s * 0.16 - age * 800 * p.s * 0.05;
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.drawImage(im, fx - im.width * k / 2, fy - im.height * k / 2, im.width * k, im.height * k);
+      ctx.restore();
+    }
+  }
+
+  // ---------------------------------------------------------------- drawing helpers
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+  }
+  function wrap(text, maxW) {
+    // CJK breaks between characters; runs of Latin letters/digits stay whole
+    const tokens = text.match(/[A-Za-z0-9.\-_/]+|./gu) || [];
+    const lines = []; let cur = "";
+    for (const tok of tokens) {
+      const test = cur + tok;
+      if (ctx.measureText(test).width > maxW && cur.trim()) {
+        if ("，。！？、；：）》」".includes(tok)) { lines.push(test); cur = ""; continue; }
+        lines.push(cur); cur = tok === " " ? "" : tok;
+      } else cur = test;
+    }
+    if (cur) lines.push(cur);
+    return lines;
+  }
+  function bubble(x, bottom, text, shown, alpha, fontPx, maxW, lo, hi) {
+    ctx.save();
+    ctx.font = `500 ${fontPx}px ${BODY}`;
+    const lines = wrap(text, maxW);
+    const lh = fontPx * 1.45;
+    let w = 0; for (const l of lines) w = Math.max(w, ctx.measureText(l).width);
+    w = Math.max(w + 36, 90); const h = lines.length * lh + 26;
+    const bx = clamp(x - w / 2, lo, hi - w), by = bottom - h - 12;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = C.bubble; ctx.strokeStyle = C.bubbleLine; ctx.lineWidth = 2;
+    rr(bx, by, w, h, 18); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x - 10, by + h - 1); ctx.lineTo(x, by + h + 12); ctx.lineTo(x + 10, by + h - 1); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 10, by + h); ctx.lineTo(x, by + h + 12); ctx.lineTo(x + 10, by + h); ctx.stroke();
+    ctx.fillStyle = C.bubbleText; ctx.textBaseline = "top";
+    let left = shown;
+    lines.forEach((l, i) => {
+      const part = [...l].slice(0, Math.max(0, left)).join("");
+      left -= [...l].length;
+      ctx.fillText(part, bx + 18, by + 13 + i * lh + (lh - fontPx) / 2 - 2);
+    });
+    ctx.restore();
+    return { bx, by, w, h };
+  }
+  function headTop(p) { return p.y - (780 - 150) * p.s; }
+
+  // ---------------------------------------------------------------- phone
+  function phoneAlpha(t) { return Math.min(prog(t, 5.0, 6.0), 1 - prog(t, 55.9, 56.8)); }
+  function phoneScale(t) { return lerp(0.94, 1, outCubic(prog(t, 5.0, 6.0))) * lerp(1, 0.94, prog(t, 55.9, 56.8)); }
+
+  function drawWallpaper(t) {
+    const g = ctx.createLinearGradient(0, SCR.y, 0, SCR.y + SCR.h);
+    g.addColorStop(0, "#FFF7EF"); g.addColorStop(1, "#FBE3D1");
+    ctx.fillStyle = g; ctx.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
+    const cols = ["#F6C8A6", "#CFE3D4", "#D7DAF2", "#F3D3DF", "#F9E2A9", "#CDE6EE", "#F2CBB8", "#DCD3EE"];
+    for (let r = 0; r < 2; r++) for (let c = 0; c < 4; c++) {
+      const x = SCR.x + 44 + c * 104, y = SCR.y + 110 + r * 120;
+      ctx.fillStyle = cols[r * 4 + c]; rr(x, y, 72, 72, 20); ctx.fill();
+      ctx.fillStyle = "rgba(59,38,32,0.18)"; rr(x + 12, y + 84, 48, 8, 4); ctx.fill();
+    }
+  }
+  function drawDoc(t, a) {
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
+    ctx.fillStyle = "#F4EEE8"; ctx.fillRect(SCR.x, SCR.y + 60, SCR.w, 64);
+    ctx.fillStyle = C.ink; ctx.font = `700 22px ${BODY}`; ctx.textBaseline = "middle";
+    ctx.fillText("周报.docx", SCR.x + 28, SCR.y + 92);
+    ctx.font = `900 30px ${BODY}`; ctx.fillText("本周工作总结", SCR.x + 28, SCR.y + 180);
+    ctx.font = `400 22px ${BODY}`; ctx.fillStyle = "#5B4A42";
+    const items = ["1. 完成桌宠的聊天与语音功能", "2. 修复动画帧里的眼白缺失", "3. 优化了一些东西"];
+    items.forEach((s, i) => ctx.fillText(s, SCR.x + 28, SCR.y + 240 + i * 52));
+    ctx.fillStyle = "#EDE6DF";
+    for (let i = 0; i < 4; i++) { rr(SCR.x + 28, SCR.y + 420 + i * 34, SCR.w - 56 - (i % 2) * 90, 12, 6); ctx.fill(); }
+    ctx.restore();
+  }
+  function drawStatus() {
+    ctx.fillStyle = C.ink; ctx.font = `700 20px ${BODY}`; ctx.textBaseline = "middle";
+    ctx.fillText("9:41", SCR.x + 40, SCR.y + 30);
+    ctx.fillStyle = "rgba(59,38,32,0.75)";
+    rr(SCR.x + SCR.w - 78, SCR.y + 22, 36, 16, 5); ctx.fill();
+    for (let i = 0; i < 3; i++) { rr(SCR.x + SCR.w - 124 + i * 9, SCR.y + 34 - i * 5, 6, 6 + i * 5, 2); ctx.fill(); }
+    ctx.fillStyle = "rgba(59,38,32,0.35)"; rr(SCR.x + SCR.w / 2 - 70, SCR.y + SCR.h - 18, 140, 6, 3); ctx.fill();
+  }
+  function keyboardY(t) {
+    const up = outCubic(prog(t, 36.3, 36.8)), down = inCubic(prog(t, 40.4, 40.85));
+    return SCR.y + SCR.h - 300 * up * (1 - down);
+  }
+  function drawKeyboard(t) {
+    const ky = keyboardY(t);
+    if (ky >= SCR.y + SCR.h - 1) return;
+    // message field
+    ctx.fillStyle = "#FFFFFF"; ctx.strokeStyle = C.line; ctx.lineWidth = 2;
+    rr(SCR.x + 20, ky - 66, SCR.w - 40, 50, 25); ctx.fill(); ctx.stroke();
+    const typed = "晚上一起吃饭吗？";
+    const n = Math.floor(clamp((t - 37.8) / 2.2, 0, 1) * typed.length);
+    ctx.fillStyle = n ? C.ink : "#A8978C"; ctx.font = `400 21px ${BODY}`; ctx.textBaseline = "middle";
+    ctx.fillText(n ? [...typed].slice(0, n).join("") : "输入消息…", SCR.x + 44, ky - 41);
+    ctx.fillStyle = "#ECE6E0"; ctx.fillRect(SCR.x, ky, SCR.w, 300);
+    const rows = [10, 9, 7];
+    const hit = Math.floor(t * 9);
+    rows.forEach((cnt, r) => {
+      const kw = (SCR.w - 24) / 10 - 6;
+      const off = (10 - cnt) * (kw + 6) / 2;
+      for (let i = 0; i < cnt; i++) {
+        const lit = t > 37.8 && t < 40.0 && (hit * 7 + r * 3) % 26 === i + r * 10 % 26;
+        ctx.fillStyle = lit ? "#F9D9C4" : "#FFFFFF";
+        rr(SCR.x + 12 + off + i * (kw + 6), ky + 18 + r * 62, kw, 52, 8); ctx.fill();
+      }
+    });
+    ctx.fillStyle = "#FFFFFF"; rr(SCR.x + 110, ky + 204, SCR.w - 220, 52, 8); ctx.fill();
+  }
+  function drawConsent(t) {
+    const a = Math.min(outCubic(prog(t, 44.2, 44.45)), 1 - prog(t, 44.9, 45.1));
+    if (a <= 0) return;
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.fillStyle = "rgba(43,33,29,0.35)"; ctx.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
+    const w = 380, h = 220, x = CX - w / 2, y = SCR.y + 340;
+    const s = lerp(0.9, 1, outBack(prog(t, 44.2, 44.5)));
+    ctx.translate(CX, y + h / 2); ctx.scale(s, s); ctx.translate(-CX, -(y + h / 2));
+    ctx.fillStyle = "#FFFFFF"; rr(x, y, w, h, 26); ctx.fill();
+    ctx.fillStyle = C.ink; ctx.font = `700 24px ${BODY}`; ctx.textBaseline = "top";
+    ctx.fillText("要开始截屏吗？", x + 30, y + 30);
+    ctx.fillStyle = C.muted; ctx.font = `400 18px ${BODY}`;
+    ctx.fillText("Clau娘 将看到屏幕上显示的内容", x + 30, y + 74);
+    ctx.fillStyle = C.muted; ctx.font = `500 20px ${BODY}`; ctx.fillText("取消", x + 150, y + 160);
+    ctx.fillStyle = C.accent; rr(x + 222, y + 148, 128, 46, 23); ctx.fill();
+    ctx.fillStyle = "#FFFFFF"; ctx.fillText("立即开始", x + 246, y + 160);
+    ctx.restore();
+  }
+  function drawShutter(t) {
+    const k = prog(t, 45.15, 45.5);
+    if (k <= 0 || k >= 1) return;
+    ctx.save(); ctx.globalAlpha = Math.sin(k * Math.PI) * 0.85;
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(SCR.x, SCR.y, SCR.w, SCR.h);
+    ctx.globalAlpha = Math.sin(k * Math.PI);
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 6; const m = 18 + 10 * k, L = 60;
+    const corners = [[SCR.x + m, SCR.y + m, 1, 1], [SCR.x + SCR.w - m, SCR.y + m, -1, 1], [SCR.x + m, SCR.y + SCR.h - m, 1, -1], [SCR.x + SCR.w - m, SCR.y + SCR.h - m, -1, -1]];
+    for (const [x, y, dx, dy] of corners) { ctx.beginPath(); ctx.moveTo(x, y + dy * L); ctx.lineTo(x, y); ctx.lineTo(x + dx * L, y); ctx.stroke(); }
+    ctx.restore();
+  }
+
+  function drawPhone(t) {
+    const a = phoneAlpha(t);
+    if (a <= 0) return false;
+    const s = phoneScale(t);
+    ctx.save();
+    ctx.globalAlpha = a;
+    ctx.translate(PHONE.x + PHONE.w / 2, PHONE.y + PHONE.h / 2); ctx.scale(s, s); ctx.translate(-(PHONE.x + PHONE.w / 2), -(PHONE.y + PHONE.h / 2));
+    ctx.save(); ctx.shadowColor = "rgba(59,38,32,0.25)"; ctx.shadowBlur = 50; ctx.shadowOffsetY = 18;
+    ctx.fillStyle = C.bezel; rr(PHONE.x, PHONE.y, PHONE.w, PHONE.h, PHONE.r); ctx.fill(); ctx.restore();
+    ctx.fillStyle = C.bezel; rr(PHONE.x + PHONE.w - 2, PHONE.y + 220, 8, 90, 4); ctx.fill();
+    ctx.save(); rr(SCR.x, SCR.y, SCR.w, SCR.h, SCR.r); ctx.clip();
+    drawWallpaper(t);
+    drawDoc(t, Math.min(prog(t, 42.5, 43.0), 1 - prog(t, 50.6, 51.1)));
+    drawStatus();
+    return true;   // caller draws inside the clip, then calls endPhone()
+  }
+  function endPhone() { ctx.restore(); ctx.restore(); }
+
+  // ---------------------------------------------------------------- finger
+  function finger(t) {
+    // [time, x, y, pressed]
+    const K = [
+      [12.1, 1480, 1060, 0], [12.6, 1310, 880, 0], [12.8, 1310, 880, 1], [12.95, 1310, 880, 0], [13.7, 1300, 770, 0], [14.0, 1300, 770, 1],
+      [15.6, 1300, 770, 1], [15.75, 1300, 770, 0], [16.3, 1470, 900, 0], [18.3, 1300, 770, 0], [18.6, 1300, 770, 1], [18.9, 1300, 630, 1],
+      [19.85, 1300, 630, 1], [19.9, 1300, 630, 0], [20.3, 1480, 760, 0],
+      [22.2, 1480, 1000, 0], [22.5, 1310, 860, 0], [22.6, 1310, 860, 1], [22.7, 1310, 860, 0], [24.6, 1450, 676, 0], [24.85, 1450, 676, 1], [24.95, 1450, 676, 0], [25.4, 1500, 900, 0],
+      [42.9, 1480, 1000, 0], [43.2, 1310, 870, 0], [43.3, 1310, 870, 1], [43.38, 1310, 870, 0], [43.5, 1310, 870, 1], [43.58, 1310, 870, 0], [43.7, 1310, 870, 1], [43.78, 1310, 870, 0],
+      [44.4, 1380, 600, 0], [44.75, 1380, 588, 0], [44.8, 1380, 588, 1], [44.9, 1380, 588, 0], [45.3, 1500, 900, 0],
+    ];
+    const windows = [[12.1, 20.6], [22.2, 25.7], [42.9, 45.6]];
+    const win = windows.find((w) => t >= w[0] && t <= w[1]);
+    if (!win) return;
+    let a = K[0], b = K[0];
+    for (let i = 0; i < K.length - 1; i++) if (t >= K[i][0] && t <= K[i + 1][0]) { a = K[i]; b = K[i + 1]; break; }
+    const k = inOut(prog(t, a[0], b[0]));
+    let x = lerp(a[1], b[1], k), y = lerp(a[2], b[2], k);
+    if (between(t, 18.9, 19.8)) x += Math.sin((t - 18.9) * 18) * 70 * Math.sin(prog(t, 18.9, 19.8) * Math.PI);
+    const pressed = a[3] === 1;
+    const alpha = Math.min(prog(t, win[0], win[0] + 0.25), 1 - prog(t, win[1] - 0.3, win[1]));
+    ctx.save(); ctx.globalAlpha = alpha;
+    // long-press ring
+    if (between(t, 14.0, 15.6)) {
+      const k2 = prog(t, 14.0, 14.6);
+      ctx.strokeStyle = "rgba(224,103,44,0.55)"; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x, y, 30 + 18 * k2, -Math.PI / 2, -Math.PI / 2 + k2 * Math.PI * 2); ctx.stroke();
+    }
+    ctx.fillStyle = pressed ? "rgba(59,38,32,0.32)" : "rgba(59,38,32,0.18)";
+    ctx.strokeStyle = "rgba(59,38,32,0.55)"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(x, y, pressed ? 24 : 28, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  const TAPS = [[12.8, 1310, 880], [22.6, 1310, 860], [24.85, 1450, 676], [43.3, 1310, 870, "1"], [43.5, 1310, 870, "2"], [43.7, 1310, 870, "3"], [44.8, 1380, 588]];
+  function drawTaps(t) {
+    for (const [t0, x, y, label] of TAPS) {
+      const k = prog(t, t0, t0 + 0.45);
+      if (k <= 0 || k >= 1) continue;
+      ctx.save(); ctx.globalAlpha = 1 - k; ctx.strokeStyle = C.accent; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(x, y, 26 + 46 * outCubic(k), 0, Math.PI * 2); ctx.stroke();
+      if (label) {
+        ctx.fillStyle = C.accent; ctx.font = `900 30px ${BODY}`; ctx.textAlign = "center";
+        ctx.fillText(label, x + 46 + Number(label) * 6, y - 40 - k * 20);
+      }
+      ctx.restore();
+    }
+  }
+
+  // ---------------------------------------------------------------- chat UI in the phone
+  function drawInput(t, p) {
+    const a = Math.min(outCubic(prog(t, 22.75, 23.0)), 1 - prog(t, 25.0, 25.2));
+    if (a <= 0) return;
+    const s = lerp(0.85, 1, outBack(prog(t, 22.75, 23.05)));
+    const w = 430, h = 74, x = CX - w / 2, bottom = headTop(p) - 10, y = bottom - h - 12;
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.translate(CX, bottom); ctx.scale(s, s); ctx.translate(-CX, -bottom);
+    ctx.fillStyle = C.bubble; ctx.strokeStyle = C.bubbleLine; ctx.lineWidth = 2;
+    rr(x, y, w, h, 18); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(CX - 10, y + h - 1); ctx.lineTo(CX, y + h + 12); ctx.lineTo(CX + 10, y + h - 1); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#806E62"; rr(x + 12, y + 13, 270, 48, 12); ctx.stroke();
+    const text = "今天终于把 bug 修好了！";
+    const n = Math.floor(clamp((t - 23.1) / 1.5, 0, 1) * [...text].length);
+    ctx.font = `400 21px ${BODY}`; ctx.textBaseline = "middle";
+    ctx.fillStyle = n ? C.bubbleText : "#B8A79B";
+    const shown = n ? [...text].slice(0, n).join("") : "输入想说的话…";
+    ctx.fillText(shown, x + 26, y + 37);
+    if (n && Math.floor(t * 2) % 2 === 0) { const cw = ctx.measureText(shown).width; ctx.fillStyle = C.bubbleText; ctx.fillRect(x + 28 + cw, y + 24, 2, 26); }
+    ctx.fillStyle = "#B8A79B"; ctx.font = `400 24px ${BODY}`; ctx.fillText("⤢", x + 298, y + 38);
+    ctx.fillStyle = "#FFF3E6"; rr(x + 336, y + 15, 80, 44, 12); ctx.fill();
+    ctx.fillStyle = C.ink; ctx.font = `700 19px ${BODY}`; ctx.fillText("发送", x + 357, y + 38);
+    ctx.fillStyle = C.bubble; ctx.strokeStyle = C.bubbleLine; ctx.beginPath(); ctx.arc(x + w - 4, y + 4, 15, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C.bubbleText; ctx.font = `400 20px ${BODY}`; ctx.textAlign = "center"; ctx.fillText("×", x + w - 4, y + 5);
+    ctx.restore();
+  }
+  // speech bubbles in the phone (or above her on the open stage)
+  const SAY = [
+    ["v0", 1.4, 5.0, "stage"], ["v1", 15.8, 18.7, "phone"], ["v2", 26.3, 31.0, "phone"], ["v3", 37.1, 38.3, "phone"],
+    ["v4", 46.5, 50.6, "phone"], ["v5", 59.4, 63.0, "stage"],
+  ];
+  function drawSay(t, p, where) {
+    for (const [k, t0, t1, w] of SAY) {
+      if (w !== where || t < t0 || t > t1) continue;
+      const [vs, vd, text] = VOICE[k];
+      const shown = Math.floor(clamp((t - vs) / (vd * 0.9), 0, 1) * [...text].length);
+      const a = Math.min(prog(t, t0, t0 + 0.2), 1 - prog(t, t1 - 0.35, t1));
+      const big = where === "stage";
+      const b = big ? bubble(p.x, headTop(p) - 12, text, shown, a, 34, 760, 60, W - 60)
+                    : bubble(p.x, headTop(p) - 4, text, shown, a, 22, 380, SCR.x + 10, SCR.x + SCR.w - 10);
+      if (between(t, vs, vs + vd)) {            // voice indicator
+        ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = C.accent;
+        for (let i = 0; i < 4; i++) {
+          const hh = (big ? 16 : 10) * (0.5 + 0.5 * Math.abs(Math.sin(t * 9 + i * 1.3)));
+          const bx = b.bx + b.w + (big ? 14 : 10) + i * (big ? 9 : 6);
+          rr(bx, b.by + b.h / 2 - hh / 2, big ? 5 : 4, hh, 2); ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+  }
+  function drawEmotionTag(t, p) {
+    if (t < 31.2 || t > 35.95) return;
+    const steps = [[31.3, "开心"], [32.2, "害羞"], [33.1, "生气"], [34.0, "委屈"], [34.9, "思考"]];
+    let cur = null; for (const s of steps) if (t >= s[0]) cur = s;
+    if (!cur) return;
+    const a = Math.min(prog(t, cur[0], cur[0] + 0.15), 1 - prog(t, 35.6, 35.95));
+    const s = lerp(0.8, 1, outBack(prog(t, cur[0], cur[0] + 0.25)));
+    const y = headTop(p) - 46;
+    ctx.save(); ctx.globalAlpha = a; ctx.translate(p.x, y); ctx.scale(s, s);
+    ctx.font = `700 24px ${BODY}`; const label = `【${cur[1]}】`; const w = ctx.measureText(label).width + 28;
+    ctx.fillStyle = C.accentSoft; ctx.strokeStyle = C.accent; ctx.lineWidth = 2; rr(-w / 2, -22, w, 44, 22); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = C.accent; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(label, 0, 1);
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- captions (left side)
+  const SCENES = [
+    [6.6, 12.0, "日常", "她有自己的日常", "不打扰你的时候，她会散步、喝下午茶、看看书，困了就坐下打个盹。", []],
+    [12.0, 22.0, "互动", "摸摸头，戳一戳", "拎起来晃一晃也可以。每个动作都会告诉模型，她按自己的性格回应。", []],
+    [22.0, 31.0, "聊天", "点一下，就能聊天", "回复完整地显示在她头顶的气泡里，再用离线语音读给你听。", ["Claude", "OpenAI", "Gemini", "DeepSeek", "离线语音"]],
+    [31.0, 36.0, "表情", "回复里带着情绪", "每句回复都附一个表情标签：开心、害羞、生气、委屈、思考，她的样子随之变化。", []],
+    [36.0, 42.5, "键盘", "键盘一弹，零档起飞", "需要打字时，她会自己躲到屏幕顶上；键盘收起，再落回原处。", []],
+    [42.5, 50.6, "识图", "连点三下，让她看看屏幕", "截一张图交给模型（她会先藏起来），然后说说看到了什么。", ["需要支持识图的模型"]],
+    [50.6, 55.6, "角色卡", "换个角色也可以", "内置「Claude大小姐」，也能自己写，或导入 SillyTavern 角色卡。", []],
+  ];
+  function drawCaptions(t) {
+    SCENES.forEach(([t0, t1, eyebrow, title, desc, chips], idx) => {
+      const kin = outCubic(prog(t, t0 + 0.1, t0 + 0.6)), kout = prog(t, t1 - 0.45, t1 - 0.05);
+      const a = kin * (1 - kout);
+      if (a <= 0) return;
+      const dy = (1 - kin) * 34 - kout * 24;
+      ctx.save(); ctx.globalAlpha = a; ctx.translate(0, dy); ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = C.accent; ctx.font = `700 26px ${BODY}`;
+      ctx.fillText(`${String(idx + 1).padStart(2, "0")} · ${eyebrow}`, 150, 330);
+      ctx.fillStyle = C.ink; ctx.font = `900 64px ${BODY}`; ctx.fillText(title, 150, 420);
+      ctx.fillStyle = C.muted; ctx.font = `400 32px ${BODY}`;
+      const lines = wrap(desc, 760);
+      lines.forEach((l, i) => ctx.fillText(l, 150, 490 + i * 50));
+      let cx = 150; const cy = 490 + lines.length * 50 + 24;
+      ctx.font = `500 24px ${BODY}`;
+      chips.forEach((c, i) => {
+        const ka = outCubic(prog(t, t0 + 0.5 + i * 0.12, t0 + 0.9 + i * 0.12));
+        const w = ctx.measureText(c).width + 32;
+        ctx.save(); ctx.globalAlpha = a * ka;
+        ctx.fillStyle = C.accentSoft; rr(cx, cy, w, 46, 23); ctx.fill();
+        ctx.fillStyle = C.accent; ctx.fillText(c, cx + 16, cy + 31);
+        ctx.restore();
+        cx += w + 12;
+      });
+      ctx.restore();
+    });
+    // feature progress dots
+    const a = Math.min(prog(t, 6.6, 7.0), 1 - prog(t, 55.4, 55.8));
+    if (a > 0) {
+      ctx.save(); ctx.globalAlpha = a;
+      SCENES.forEach(([t0, t1], i) => {
+        const on = t >= t0 && t < t1;
+        const done = t >= t1;
+        ctx.fillStyle = on ? C.accent : done ? "#F2B896" : C.line;
+        rr(150 + i * 34, 960, on ? 26 : 14, 14, 7); ctx.fill();
+      });
+      ctx.restore();
+    }
+  }
+  function drawBrand(t) {
+    const a = Math.min(prog(t, 6.2, 6.8), 1 - prog(t, 55.4, 55.8));
+    if (a <= 0) return;
+    const av = img.avatar;
+    ctx.save(); ctx.globalAlpha = a;
+    ctx.save(); ctx.beginPath(); ctx.arc(176, 110, 26, 0, Math.PI * 2); ctx.clip();
+    if (av && av.width) ctx.drawImage(av, 150, 84, 52, 52);
+    ctx.restore();
+    ctx.fillStyle = C.ink; ctx.font = `400 32px ${DISPLAY}`; ctx.textBaseline = "middle"; ctx.fillText("Clau娘", 214, 112);
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- character cards
+  function drawCards(t) {
+    const out = prog(t, 55.6, 56.0);
+    const defs = [
+      ["Claude大小姐", "内置 · 由 Claude 驱动", "avatar"],
+      ["自定义角色", "写下她是谁、怎么说话", "+"],
+      ["导入角色卡", "SillyTavern · .json / .png", "file"],
+    ];
+    defs.forEach(([name, sub, icon], i) => {
+      const kin = outBack(prog(t, 51.0 + i * 0.15, 51.55 + i * 0.15));
+      if (kin <= 0) return;
+      const x = 150 + i * 300, y = 700 + (1 - kin) * 140 + out * 60, rot = [-5, 0, 5][i] * kin;
+      ctx.save(); ctx.globalAlpha = Math.min(1, prog(t, 51.0 + i * 0.15, 51.25 + i * 0.15)) * (1 - out);
+      ctx.translate(x + 135, y + 85); ctx.rotate(rot * Math.PI / 180); ctx.translate(-(x + 135), -(y + 85));
+      const sel = i === 0 && t > 52.3;
+      ctx.save(); ctx.shadowColor = "rgba(59,38,32,0.16)"; ctx.shadowBlur = 24; ctx.shadowOffsetY = 8;
+      ctx.fillStyle = "#FFFFFF"; rr(x, y, 270, 170, 22); ctx.fill(); ctx.restore();
+      ctx.strokeStyle = sel ? C.accent : C.line; ctx.lineWidth = sel ? 4 : 2; rr(x, y, 270, 170, 22); ctx.stroke();
+      if (icon === "avatar") {
+        ctx.save(); ctx.beginPath(); ctx.arc(x + 50, y + 54, 30, 0, Math.PI * 2); ctx.clip();
+        if (img.avatar.width) ctx.drawImage(img.avatar, x + 20, y + 24, 60, 60); ctx.restore();
+      } else {
+        ctx.fillStyle = C.accentSoft; ctx.beginPath(); ctx.arc(x + 50, y + 54, 30, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = C.accent; ctx.font = `900 30px ${BODY}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(icon === "+" ? "+" : "↥", x + 50, y + 55); ctx.textAlign = "left";
+      }
+      ctx.fillStyle = C.ink; ctx.font = `700 26px ${BODY}`; ctx.textBaseline = "alphabetic"; ctx.fillText(name, x + 24, y + 124);
+      ctx.fillStyle = C.muted; ctx.font = `400 18px ${BODY}`; ctx.fillText(sub, x + 24, y + 152);
+      if (sel) { ctx.fillStyle = C.accent; ctx.font = `700 18px ${BODY}`; ctx.fillText("使用中", x + 192, y + 44); }
+      ctx.restore();
+    });
+  }
+
+  // ---------------------------------------------------------------- titles on the open stage
+  function drawTitles(t) {
+    const intro = Math.min(outCubic(prog(t, 1.0, 1.7)), 1 - prog(t, 4.8, 5.3));
+    const outro = outCubic(prog(t, 58.0, 58.8));
+    const a = Math.max(intro, outro);
+    if (a <= 0) return;
+    ctx.save(); ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+    const dy = (1 - a) * 30;
+    ctx.globalAlpha = a;
+    ctx.fillStyle = C.ink; ctx.font = `400 96px ${DISPLAY}`; ctx.fillText("Clau娘", 960, 965 + dy);
+    const sub = t < 30 ? intro : outCubic(prog(t, 58.4, 59.1));
+    ctx.globalAlpha = sub; ctx.fillStyle = C.accent; ctx.font = `700 32px ${BODY}`;
+    ctx.fillText("住在你屏幕上的 Claude", 960, 1022 + (1 - sub) * 20);
+    if (t > 50) {
+      const k = outCubic(prog(t, 58.9, 59.6));
+      ctx.globalAlpha = k; ctx.fillStyle = C.muted; ctx.font = `400 24px ${BODY}`;
+      ctx.fillText("安卓桌宠 · 聊天 · 离线语音 · 表情 · 识图 · 角色卡　|　GitHub Releases 下载", 960, 1060);
+    }
+    ctx.restore();
+  }
+
+  // ---------------------------------------------------------------- frame
+  function render(t) {
+    t = clamp(t, 0, DURATION);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, W, H);
+    // soft brand glow on the open stage
+    const glow = Math.max(1 - prog(t, 5.0, 6.0), prog(t, 55.9, 56.8));
+    if (glow > 0) {
+      const g = ctx.createRadialGradient(960, 620, 50, 960, 620, 620);
+      g.addColorStop(0, `rgba(252,230,216,${0.9 * glow})`); g.addColorStop(1, "rgba(252,230,216,0)");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    }
+    drawCaptions(t);
+    drawBrand(t);
+    drawTitles(t);
+    const inPhone = drawPhone(t);
+    const p = pet(t);
+    if (inPhone) {
+      drawKeyboard(t);
+      if (t > 6.4 && t < 55.9) { drawPet(t); drawFx(t, p); }
+      drawEmotionTag(t, p);
+      drawInput(t, p);
+      drawSay(t, p, "phone");
+      drawConsent(t);
+      drawShutter(t);
+      endPhone();
+    }
+    if (!(t > 6.4 && t < 55.9)) { drawPet(t); drawFx(t, p); }
+    drawSay(t, p, "stage");
+    drawCards(t);
+    drawTaps(t);
+    finger(t);
+  }
+
+  // ---------------------------------------------------------------- player
+  const seek = document.getElementById("seek");
+  const toggle = document.getElementById("toggle");
+  const big = document.getElementById("bigplay");
+  const timeLabel = document.getElementById("time");
+  let playing = false, t = 3.0, last = 0;
+  const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  function syncAudio() {
+    for (const [k, a] of Object.entries(audio)) {
+      const [s, d] = VOICE[k];
+      const on = playing && t >= s && t < s + d;
+      if (on && a.paused) { try { a.currentTime = Math.max(0, t - s); a.play().catch(() => {}); } catch (e) {} }
+      if (!on && !a.paused) a.pause();
+    }
+  }
+  function frame(now) {
+    if (!playing) return;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    t += dt;
+    if (t >= DURATION) { t = DURATION; setPlaying(false); }
+    render(t); seek.value = t; timeLabel.textContent = `${fmt(t)} / ${fmt(DURATION)}`;
+    syncAudio();
+    if (playing) requestAnimationFrame(frame);
+  }
+  function setPlaying(on) {
+    playing = on;
+    toggle.textContent = on ? "暂停" : "播放";
+    big.hidden = on;
+    if (on) { if (t >= DURATION - 0.05) t = 0; last = performance.now(); requestAnimationFrame(frame); }
+    syncAudio();
+  }
+  toggle.addEventListener("click", () => setPlaying(!playing));
+  big.addEventListener("click", () => setPlaying(true));
+  document.getElementById("replay").addEventListener("click", () => { t = 0; setPlaying(true); });
+  seek.addEventListener("input", () => {
+    t = Number(seek.value); render(t); timeLabel.textContent = `${fmt(t)} / ${fmt(DURATION)}`;
+    for (const a of Object.values(audio)) if (!a.paused) a.pause();
+    syncAudio();
+  });
+
+  const fontsReady = Promise.all([
+    document.fonts.load(`400 32px "Noto Sans SC"`, "中文"), document.fonts.load(`700 32px "Noto Sans SC"`, "中文"),
+    document.fonts.load(`900 32px "Noto Sans SC"`, "中文"), document.fonts.load(`400 32px "ZCOOL KuaiLe"`, "Clau娘"),
+  ]).catch(() => {});
+  const ready = Promise.all([fontsReady, ...loads]).then(() => { render(t); });
+  render(t);
+  window.__promo = { duration: DURATION, render, ready };
+})();
+</script>
