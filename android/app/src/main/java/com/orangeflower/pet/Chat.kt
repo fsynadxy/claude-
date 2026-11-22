@@ -106,6 +106,25 @@ object Emotion {
     fun strip(text: String) = tag.replace(text, "").trim()
 }
 
+/**
+ * Stage directions such as （笑了笑）, (sighs) or *tilts head*. They are dimmed in the bubble and
+ * skipped by the voice: the pet's animation already shows what she does.
+ */
+object ActionText {
+    val pattern = Regex("（[^（）\\n]{0,40}）|\\([^()\\n]{0,40}\\)|\\*[^*\\n]{1,40}\\*")
+    fun strip(text: String) = pattern.replace(text, "").replace(Regex("[ \\t]{2,}"), " ").trim()
+
+    /** Greys out stage directions in [text] (for bubbles and the chat history). */
+    fun dim(text: CharSequence, color: Int): CharSequence {
+        val sb = android.text.SpannableStringBuilder(text)
+        for (m in pattern.findAll(text)) {
+            sb.setSpan(android.text.style.ForegroundColorSpan(color), m.range.first, m.range.last + 1, 0)
+            sb.setSpan(android.text.style.RelativeSizeSpan(0.85f), m.range.first, m.range.last + 1, 0)
+        }
+        return sb
+    }
+}
+
 /** User-side messages that describe what was done to the pet rather than said. */
 const val ACTION_PREFIX = "【互动】"
 
@@ -146,6 +165,7 @@ object ChatClient {
         "【桌宠说明】你现在住在{{user}}的手机屏幕上，是一个Q版桌宠。你的回复会先显示在头顶的小气泡里，" +
             "完整内容显示在聊天窗口。平时用一到三句自然口语回答；除非对方要求，不要长篇大论；" +
             "不要使用 Markdown、标题或列表符号。" +
+            "\n只写你说出口的话：不要写动作、神态或心理描写，也不要用括号或星号描述动作，你的动作和表情会由桌宠动画表现。" +
             "\n每次回复的最开头，用一个标签标出你此刻的表情，只能从【开心】【害羞】【生气】【委屈】【惊讶】【思考】【平静】里选一个，" +
             "例如：【开心】嘿嘿，谢谢。标签只在开头出现一次。" +
             "\n当{{user}}的消息以【互动】开头时，表示{{user}}在屏幕上对你做了这个动作，而不是在说话。" +

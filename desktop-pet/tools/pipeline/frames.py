@@ -11,29 +11,29 @@ CFG = {
  'walk':   dict(src='walk8', grid=(4, 2), cells=[0, 1, 2, 3, 4, 5, 6, 7], anchor='feet', ref=('self', 0, 1.0)),
  'drag':   dict(src='drag', grid=(1, 1), cells=[0], anchor='air', ref=('self', 0, 1.0)),
  'fall':   dict(src='fall', grid=(1, 1), cells=[0], anchor='air', ref=('borrow', 'poke', 1.0)),
- 'land':   dict(src='land', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 1, 1.0)),
- 'sit':    dict(src='sit', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('borrow', 'read', 1.0)),
- 'sleep':  dict(src='sleep', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('borrow', 'read', 1.0)),
+ 'land':   dict(src='land4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('borrow', 'wave', 1.0)),
+ 'sit':    dict(src='sit', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('fixed', 0.429)),
+ 'sleep':  dict(src='sleep', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('fixed', 0.429)),
  'poke':   dict(src='poke', grid=(1, 1), cells=[0], anchor='feet', ref=('self', 0, 1.0)),
- 'pat':    dict(src='pat', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
- 'read':   dict(src='read', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
- 'tea':    dict(src='tea', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
- 'yawn':   dict(src='yawn', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
- 'curtsy': dict(src='curtsy', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
- 'wave':   dict(src='wave', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
+ 'pat':    dict(src='pat4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 1, 1.0)),
+ 'read':   dict(src='read4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 0, 1.0)),
+ 'tea':    dict(src='tea4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 0, 1.0)),
+ 'yawn':   dict(src='yawn4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 0, 1.0)),
+ 'curtsy': dict(src='curtsy4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 0, 1.0)),
+ 'wave':   dict(src='wave4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 0, 1.0)),
  'think':  dict(src='think', grid=(1, 1), cells=[0], anchor='feet', ref=('self', 0, 1.0)),
- 'happy':  dict(src='happy', grid=(2, 1), cells=[0, 1], anchor='feet_rel', ref=('self', 1, 1.0)),
+ 'happy':  dict(src='happy4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet_rel', ref=('borrow', 'wave', 1.0)),
  'angry':  dict(src='angry', grid=(1, 1), cells=[0], anchor='feet', ref=('self', 0, 1.0)),
  'shy':    dict(src='shy', grid=(1, 1), cells=[0], anchor='feet', ref=('self', 0, 1.0)),
  'sad':    dict(src='sad', grid=(1, 1), cells=[0], anchor='feet', ref=('self', 0, 1.0)),
- 'dizzy':  dict(src='dizzy', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
+ 'dizzy':  dict(src='dizzy4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 1, 1.0)),
  'bored':  dict(src='bored', grid=(1, 1), cells=[0], anchor='feet', ref=('borrow', 'poke', 1.0)),
  'hair':   dict(src='hair', grid=(1, 1), cells=[0], anchor='feet', ref=('self', 0, 1.0)),
- 'climb':  dict(src='climb4', grid=(4, 1), cells=[0, 1, 2, 3], anchor='left', ref=('borrow', 'read', 1.0), wall=True, perframe_h=636),
- 'fly':    dict(src='fly', grid=(2, 1), cells=[0, 1], anchor='air', ref=('borrow', 'read', 1.0)),
- 'hang':   dict(src='hang', grid=(2, 1), cells=[0, 1], anchor='top', ref=('borrow', 'read', 1.0)),
+ 'climb':  dict(src='climb4', grid=(4, 1), cells=[0, 1, 2, 3], anchor='left', ref=('fixed', 0.429), wall=True, perframe_h=636),
+ 'fly':    dict(src='fly4', grid=(2, 2), cells=[0, 1, 2, 3], anchor='air', ref=('borrow', 'wave', 1.0)),
+ 'hang':   dict(src='hang', grid=(2, 1), cells=[0, 1], anchor='top', ref=('fixed', 0.429)),
 }
-ORDER = ['poke', 'read'] + [k for k in CFG if k not in ('poke', 'read')]
+ORDER = ['poke', 'read', 'wave'] + [k for k in CFG if k not in ('poke', 'read', 'wave')]
 
 def load_cells(name, cfg):
     rgb = np.array(Image.open(f'raw/{cfg["src"]}.jpg').convert('RGB')).astype(np.float64)
@@ -82,6 +82,8 @@ for name in ORDER:
     if kind == 'self':
         i, f = rest
         bb = cells[i]['bb']; scales[name] = UNIT / (bb[3] - bb[1]) * f
+    elif kind == 'fixed':
+        scales[name] = rest[0]
     else:
         other, f = rest; scales[name] = scales[other] * f
     s = scales[name]
@@ -128,11 +130,11 @@ for name in ORDER:
 
 # idle family from the pixel-exact base (character height 1306 in 1024x1536, feet at 1459)
 s = UNIT / 1306
-for src, dst in [('idle', 'idle_01'), ('blink_half', 'blink_01'), ('blink_closed', 'blink_02'), ('talk', 'talk_01')]:
+for src, dst in [('idle', 'idle_01'), ('blink_half', 'blink_01'), ('blink_closed', 'blink_02'), ('talk', 'talk_01'), ('talk_half', 'talk_02')]:
     im = Image.open(f'out/{src}_full.png')
     im = im.resize((round(1024 * s), round(1536 * s)), Image.LANCZOS)
     canvas = Image.new('RGBA', (CW, CH), (0, 0, 0, 0))
     canvas.alpha_composite(im, (round(CW / 2 - im.width / 2), round(BASE - 1459 * s)))
     canvas.save(f'out/{dst}.png')
-manifest.update(idle=1, blink=2, talk=1)
+manifest.update(idle=1, blink=2, talk=2)
 json.dump(manifest, open('out/manifest.json', 'w'), indent=1)

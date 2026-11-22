@@ -42,6 +42,7 @@ Image.fromarray(base.astype(np.uint8), 'RGBA').save('out/idle_full.png')
 composite('raw/blink_closed.png', 'blink_closed')
 composite('raw/blink_half.jpg', 'blink_half')
 composite('raw/talk.jpg', 'talk')
+composite('raw/talk_half.jpg', 'talk_half')
 # QA crop
 crops = [Image.open(f'out/{n}_full.png').crop((320, 380, 660, 620)) for n in ('idle', 'blink_half', 'blink_closed', 'talk')]
 s = Image.new('RGBA', (340 * 4 + 30, 240), (40, 40, 40, 255))

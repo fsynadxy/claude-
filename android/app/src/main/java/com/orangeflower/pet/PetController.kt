@@ -154,7 +154,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
         pushLayout(force = true)
         wm.addView(view, lp)
         view.setOnTouchListener { _, e -> onTouch(e); true }
-        act("curtsy", 1.1f, false, 2.4f)
+        act("curtsy", 2.2f, false, 2.6f)
         say(Lines.greeting(), 3.5f)
         lastTick = SystemClock.uptimeMillis()
         running = true
@@ -362,22 +362,22 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private fun pickNext() {
         if (clock - lastRestReminder > 50 * 60f) {
             lastRestReminder = clock
-            act("wave", 3f, true, 3f)
+            act("wave", 6f, true, 3f)
             say(Lines.pick(Lines.rest), 4f)
             return
         }
         val r = Random.nextFloat()
         when {
             r < 0.36f -> startWalk()
-            r < 0.46f -> act("read", 0.45f, true, rnd(7f, 12f))
-            r < 0.54f -> act("tea", 0.45f, true, rnd(6f, 9f))
+            r < 0.46f -> act("read", 0.9f, true, rnd(7f, 12f))
+            r < 0.54f -> act("tea", 1.1f, true, rnd(6f, 9f))
             r < 0.60f -> act("hair", 0f, false, 3f)
             r < 0.65f -> { act("think", 0f, false, 3.5f); effect("question", 2f) }
-            r < 0.72f -> act("yawn", 0.8f, false, 2.6f) { if (Random.nextBoolean()) startSit() else idle() }
+            r < 0.72f -> act("yawn", 1.6f, false, 3f) { if (Random.nextBoolean()) startSit() else idle() }
             r < 0.84f -> startSit()
             r < 0.88f -> { act("bored", 0f, false, 5f); effect("dots", 2.5f) }
             r < 0.95f -> { say(Lines.pick(Lines.chatter)); idle() }
-            else -> act("wave", 3f, true, 2.4f)
+            else -> act("wave", 6f, true, 2.4f)
         }
     }
 
@@ -402,7 +402,13 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 when {
                     blinkT in 0f..0.06f || blinkT in 0.16f..0.22f -> { frameAnim = "blink"; frameIndex = 0 }
                     blinkT in 0.06f..0.16f -> { frameAnim = "blink"; frameIndex = 1 }
-                    clock < talkUntil && (clock * 7f).toInt() % 2 == 1 -> { frameAnim = "talk"; frameIndex = 0 }
+                    clock < talkUntil -> {
+                        // closed, half open, open, half open
+                        when ((clock * 11f).toInt() % 4) {
+                            1, 3 -> { frameAnim = "talk"; frameIndex = 1 }
+                            2 -> { frameAnim = "talk"; frameIndex = 0 }
+                        }
+                    }
                 }
                 if (blinkT > 0.22f) nextBlink = clock + rnd(2.5f, 6f)
                 if (t > idleFor && !touching && chatInput == null && !bubble.speaking) pickNext()
@@ -420,14 +426,12 @@ class PetController(private val context: Context, private val wm: WindowManager)
             }
             State.ACT -> {
                 when (anim) {
-                    "happy" -> {
-                        val b = abs(sin(t * 7f))
-                        offY = -b * winH * 0.035f
-                        frameIndex = if (b > 0.45f) 0 else 1
-                    }
+                    "happy" -> frameIndex = (t * 8f).toInt()            // hop cycle drawn in the frames
                     "dizzy" -> {
-                        rot = 5f * sin(t * 6f)
-                        frameIndex = if (sin(t * 6f) < 0f) 0 else 1
+                        // frames lean left, upright, right, upright; the small rotation follows them
+                        val phase = t * 5f
+                        frameIndex = phase.toInt()
+                        rot = 3f * sin(phase * Math.PI.toFloat() / 2f)
                     }
                     "think" -> {
                         breath = 0.006f * sin(clock * 2f * Math.PI.toFloat() / 3f)
@@ -441,10 +445,14 @@ class PetController(private val context: Context, private val wm: WindowManager)
                     if (next != null) next() else idle()
                 }
             }
-            State.POKE -> if (t > dur) idle()
+            State.POKE -> {
+                // a quick startled shiver that settles
+                if (t < 0.35f) offY = sin(t * 60f) * winH * 0.006f * (1f - t / 0.35f)
+                if (t > dur) idle()
+            }
             State.PAT -> {
-                rot = 2.5f * sin(clock * 5f)
-                frameIndex = if (sin(clock * 5f) < 0f) 0 else 1
+                rot = 1.2f * sin(clock * Math.PI.toFloat() * 1.25f)
+                frameIndex = (clock * 5f).toInt()
                 if (clock - patStartedAt > 4f) {
                     frameAnim = "shy"; frameIndex = 0
                     if (clock - patStartedAt < 4f + dt * 1.5f) say(Lines.pick(Lines.shy))
@@ -474,7 +482,12 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 }
             }
             State.LAND -> {
-                frameIndex = if (t < 0.25f) 0 else 1
+                frameIndex = when {
+                    t < 0.12f -> 0
+                    t < 0.30f -> 1
+                    t < 0.50f -> 2
+                    else -> 3
+                }.coerceAtMost(sprites.count("land") - 1)
                 if (t > dur) {
                     val event = landEvent
                     landEvent = null
@@ -492,14 +505,14 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 // mostly frame 1; a short page turn every few seconds
                 frameIndex = if ((t % 7f) > 6.2f) 1 else 0
                 breath = 0.005f * sin(clock * 2f * Math.PI.toFloat() / 3.6f)
-                if (t > dur) if (Random.nextFloat() < 0.4f) startSleep() else act("yawn", 0.8f, false, 2.6f)
+                if (t > dur) if (Random.nextFloat() < 0.4f) startSleep() else act("yawn", 1.6f, false, 3f)
             }
             State.SLEEP -> {
                 val phase = sin(clock * 2f * Math.PI.toFloat() / 4.2f)
                 breath = 0.012f * phase
                 frameIndex = if (phase < -0.2f) 1 else 0
                 if (clock - effectStart > effectLen + 1.5f) effect("zzz", 3f)
-                if (t > dur) act("yawn", 0.8f, false, 2.6f)
+                if (t > dur) act("yawn", 1.6f, false, 3f)
             }
             State.CLIMB -> {
                 mirror = !climbLeft

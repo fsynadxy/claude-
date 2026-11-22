@@ -107,7 +107,7 @@ object Voice {
         return merged
     }
 
-    private fun speakable(s: String) = s
+    private fun speakable(s: String) = ActionText.strip(s)
         .replace(Regex("[*#`>_~|]"), "")
         .replace(Regex("[\\x{1F000}-\\x{1FAFF}\\x{2600}-\\x{27BF}]"), "")
         .replace("……", "，").replace("…", "，")

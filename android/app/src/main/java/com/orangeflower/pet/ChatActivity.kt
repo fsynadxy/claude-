@@ -173,7 +173,7 @@ class ChatActivity : Activity() {
                 it.role == "user" && it.content.startsWith(ACTION_PREFIX) ->
                     addBubble("（你" + it.content.removePrefix(ACTION_PREFIX) + "）", mine = true, note = true)
                 it.role == "user" -> addBubble(it.content, mine = true)
-                else -> addBubble(Emotion.strip(it.content), mine = false)
+                else -> addBubble(Emotion.strip(it.content), mine = false).also { tv -> tv.text = ActionText.dim(tv.text, muted) }
             }
         }
         if (waiting) pending = addBubble("……", mine = false, note = true)
@@ -232,7 +232,7 @@ class ChatActivity : Activity() {
                 PetService.speak(reply)
                 if (!isDestroyed && card.id == cardNow.id) {
                     history = h
-                    pending?.let { it.text = Emotion.strip(reply); it.setTextColor(ink) }
+                    pending?.let { it.text = ActionText.dim(Emotion.strip(reply), muted); it.setTextColor(ink) }
                     pending = null
                 }
             }.onFailure { e ->

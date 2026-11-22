@@ -239,7 +239,7 @@ class SpeechBubble(context: Context, private val wm: WindowManager) {
 
     private fun setVisibleText() {
         val n = shown.toInt().coerceIn(0, target.length)
-        textView.text = if (target.isEmpty()) "……" else target.substring(0, n)
+        textView.text = if (target.isEmpty()) "……" else ActionText.dim(target.substring(0, n), BubbleStyle.hint)
         scroll.post { scroll.fullScroll(View.FOCUS_DOWN) }
         relayout()
     }
