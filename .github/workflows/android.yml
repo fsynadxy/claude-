@@ -39,9 +39,10 @@ jobs:
           path: android/dist/*.apk
           if-no-files-found: error
 
-      # Every successful build is published as a GitHub Release, so the APK can be downloaded
-      # straight onto a phone. The action creates the tag (v1.0.<run number>) itself.
+      # Publish a GitHub Release (direct APK download on a phone) only when asked: the pushed commit
+      # message contains [release], or a v* tag is pushed. The action creates the tag itself.
       - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release]')
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}

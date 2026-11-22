@@ -20,7 +20,11 @@ class PetView(context: Context) : View(context) {
     var frame: Bitmap? = null
     var mirror = false
     var rotationDeg = 0f
+    /** Rotation pivot as a fraction of the height (0.17 = near the head, 0.975 = the feet). */
+    var pivotFrac = 0.17f
     var breath = 0f
+    /** Vertical offset in px, for small procedural bounces. */
+    var offsetY = 0f
 
     var effect: Bitmap? = null
     var effectAge = 0f          // 0..1 over the effect's lifetime
@@ -45,7 +49,8 @@ class PetView(context: Context) : View(context) {
         val h = height.toFloat()
         frame?.let { bmp ->
             canvas.save()
-            if (rotationDeg != 0f) canvas.rotate(rotationDeg, w / 2f, h * 0.17f)
+            if (offsetY != 0f) canvas.translate(0f, offsetY)
+            if (rotationDeg != 0f) canvas.rotate(rotationDeg, w / 2f, h * pivotFrac)
             if (breath != 0f) canvas.scale(1f - breath * 0.5f, 1f + breath, w / 2f, h * FEET)
             if (mirror) canvas.scale(-1f, 1f, w / 2f, 0f)
             dst.set(0f, 0f, w, h)

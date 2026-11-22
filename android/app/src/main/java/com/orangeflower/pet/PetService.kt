@@ -141,6 +141,13 @@ object Prefs {
     fun size(context: Context): Float =
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getFloat("size", 1f)
 
+    fun dodgeKeyboard(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("dodge_keyboard", true)
+
+    fun setDodgeKeyboard(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("dodge_keyboard", value).apply()
+    }
+
     fun setSize(context: Context, value: Float) {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putFloat("size", value).apply()
     }

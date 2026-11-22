@@ -9,33 +9,88 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.Executors
 
-/** API settings, kept in the app's private preferences on the phone. */
+/** A model provider preset: request format, endpoint and suggested models. */
+data class Provider(
+    val id: String,
+    val label: String,
+    val format: String,
+    val base: String,
+    val models: List<String>,
+    val keyHint: String,
+)
+
+/** API settings, kept in the app's private preferences on the phone. Each provider keeps its own key and model. */
 object ChatConfig {
     const val FORMAT_ANTHROPIC = "anthropic"
     const val FORMAT_OPENAI = "openai"
-    const val DEFAULT_ANTHROPIC_BASE = "https://opencode.ai/inference/anthropic/v1"
-    const val DEFAULT_ANTHROPIC_MODEL = "claude-sonnet-5-5"
-    const val DEFAULT_OPENAI_BASE = "https://opencode.ai/inference/openai/v1"
-    const val DEFAULT_OPENAI_MODEL = "deepseek-v4.1-flash"
+    const val CUSTOM = "custom"
+
+    val providers = listOf(
+        Provider("opencode", "OpenCode", FORMAT_ANTHROPIC, "https://opencode.ai/inference/anthropic/v1",
+            listOf("claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"), "Key 在 opencode.ai 的控制台创建"),
+        Provider("anthropic", "Anthropic", FORMAT_ANTHROPIC, "https://api.anthropic.com/v1",
+            listOf("claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-5-5"), "Key 在 console.anthropic.com 创建"),
+        Provider("openai", "OpenAI", FORMAT_OPENAI, "https://api.openai.com/v1",
+            listOf("gpt-5.4-mini", "gpt-5.5", "gpt-5.4-nano"), "Key 在 platform.openai.com 创建"),
+        Provider("google", "Google Gemini", FORMAT_OPENAI, "https://generativelanguage.googleapis.com/v1beta/openai",
+            listOf("gemini-3.8-flash", "gemini-3.5-flash-lite"), "Key 在 aistudio.google.com 创建"),
+        Provider("deepseek", "DeepSeek", FORMAT_OPENAI, "https://api.deepseek.com",
+            listOf("deepseek-chat", "deepseek-reasoner"), "Key 在 platform.deepseek.com 创建"),
+        Provider(CUSTOM, "自定义", FORMAT_OPENAI, "", emptyList(), "填写任意兼容 OpenAI 或 Anthropic 格式的接口"),
+    )
 
     private fun prefs(c: Context) = c.getSharedPreferences("chat", Context.MODE_PRIVATE)
 
-    fun format(c: Context) = prefs(c).getString("format", FORMAT_ANTHROPIC) ?: FORMAT_ANTHROPIC
-    fun base(c: Context) = prefs(c).getString("base", DEFAULT_ANTHROPIC_BASE) ?: DEFAULT_ANTHROPIC_BASE
-    fun model(c: Context) = prefs(c).getString("model", DEFAULT_ANTHROPIC_MODEL) ?: DEFAULT_ANTHROPIC_MODEL
-    fun key(c: Context) = prefs(c).getString("key", "") ?: ""
+    fun provider(c: Context): Provider {
+        migrate(c)
+        val id = prefs(c).getString("provider", "opencode")
+        return providers.firstOrNull { it.id == id } ?: providers[0]
+    }
+
+    fun format(c: Context): String {
+        val p = provider(c)
+        return if (p.id == CUSTOM) prefs(c).getString("format_custom", FORMAT_OPENAI) ?: FORMAT_OPENAI else p.format
+    }
+
+    fun base(c: Context): String {
+        val p = provider(c)
+        return if (p.id == CUSTOM) prefs(c).getString("base_custom", "") ?: "" else p.base
+    }
+
+    fun model(c: Context): String = modelFor(c, provider(c))
+    fun key(c: Context): String = keyFor(c, provider(c).id)
+
+    fun modelFor(c: Context, p: Provider) = (prefs(c).getString("model_${p.id}", "") ?: "").ifBlank { p.models.firstOrNull() ?: "" }
+    fun keyFor(c: Context, id: String) = prefs(c).getString("key_$id", "") ?: ""
+    fun customBase(c: Context) = prefs(c).getString("base_custom", "") ?: ""
+    fun customFormat(c: Context) = prefs(c).getString("format_custom", FORMAT_OPENAI) ?: FORMAT_OPENAI
+
     fun userName(c: Context) = (prefs(c).getString("user", "") ?: "").ifBlank { "你" }
     fun rawUserName(c: Context) = prefs(c).getString("user", "") ?: ""
     fun isReady(c: Context) = key(c).isNotBlank() && base(c).isNotBlank() && model(c).isNotBlank()
 
-    fun save(c: Context, format: String, base: String, model: String, key: String, user: String) {
-        prefs(c).edit()
-            .putString("format", format)
-            .putString("base", base.trim())
-            .putString("model", model.trim())
-            .putString("key", key.trim())
+    fun save(c: Context, providerId: String, model: String, key: String, user: String, customBase: String, customFormat: String) {
+        val e = prefs(c).edit()
+            .putString("provider", providerId)
+            .putString("model_$providerId", model.trim())
+            .putString("key_$providerId", key.trim())
             .putString("user", user.trim())
-            .apply()
+        if (providerId == CUSTOM) e.putString("base_custom", customBase.trim()).putString("format_custom", customFormat)
+        e.apply()
+    }
+
+    /** Settings saved by 1.0.3 (single format/base/model/key) become the matching provider entry. */
+    private fun migrate(c: Context) {
+        val p = prefs(c)
+        if (p.contains("provider") || !p.contains("key")) return
+        val base = p.getString("base", "") ?: ""
+        val known = providers.firstOrNull { it.id != CUSTOM && it.base == base }
+        val id = known?.id ?: CUSTOM
+        val e = p.edit().putString("provider", id)
+            .putString("key_$id", p.getString("key", ""))
+            .putString("model_$id", p.getString("model", ""))
+        if (known == null) e.putString("base_custom", base).putString("format_custom", p.getString("format", FORMAT_OPENAI))
+        e.remove("key").remove("base").remove("model").remove("format").apply()
     }
 }
 
@@ -126,7 +181,9 @@ object ChatClient {
             .put("max_tokens", 600)
             .put("system", system)
             .put("messages", msgs)
-        val json = post(url, body, mapOf("x-api-key" to key, "anthropic-version" to "2023-06-01"), key)
+        // the official API wants only x-api-key; gateways such as OpenCode also accept a bearer token
+        val bearer = if (base.contains("api.anthropic.com")) null else key
+        val json = post(url, body, mapOf("x-api-key" to key, "anthropic-version" to "2023-06-01"), bearer)
         val content = json.optJSONArray("content") ?: throw IllegalStateException(errorText(json))
         val sb = StringBuilder()
         for (i in 0 until content.length()) {
@@ -140,14 +197,24 @@ object ChatClient {
         val url = if (base.endsWith("/chat/completions")) base else "$base/chat/completions"
         val msgs = JSONArray().put(JSONObject().put("role", "system").put("content", system))
         turns.forEach { msgs.put(JSONObject().put("role", it.role).put("content", it.content)) }
-        val body = JSONObject().put("model", model).put("max_tokens", 600).put("messages", msgs)
-        val json = post(url, body, emptyMap(), key)
+        // OpenAI's newer models only accept max_completion_tokens; most compatible APIs use max_tokens
+        val official = base.contains("api.openai.com")
+        fun body(newParam: Boolean) = JSONObject().put("model", model).put("messages", msgs)
+            .put(if (newParam) "max_completion_tokens" else "max_tokens", if (newParam) 2000 else 800)
+        val json = try {
+            post(url, body(official), emptyMap(), key)
+        } catch (e: IllegalStateException) {
+            val m = e.message ?: ""
+            if (m.startsWith("HTTP 400") && (m.contains("max_tokens") || m.contains("max_completion_tokens"))) {
+                post(url, body(!official), emptyMap(), key)
+            } else throw e
+        }
         val choices = json.optJSONArray("choices") ?: throw IllegalStateException(errorText(json))
         return choices.getJSONObject(0).getJSONObject("message").optString("content").trim()
             .ifEmpty { throw IllegalStateException("她没有说话（空回复）") }
     }
 
-    private fun post(url: String, body: JSONObject, headers: Map<String, String>, key: String): JSONObject {
+    private fun post(url: String, body: JSONObject, headers: Map<String, String>, bearer: String?): JSONObject {
         val conn = URL(url).openConnection() as HttpURLConnection
         try {
             conn.requestMethod = "POST"
@@ -156,14 +223,15 @@ object ChatClient {
             conn.doOutput = true
             conn.setRequestProperty("Content-Type", "application/json")
             conn.setRequestProperty("User-Agent", "ClauNiang/1.0")
-            conn.setRequestProperty("Authorization", "Bearer $key")
+            if (bearer != null) conn.setRequestProperty("Authorization", "Bearer $bearer")
             headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
             conn.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
             val code = conn.responseCode
             val stream = if (code in 200..299) conn.inputStream else conn.errorStream
             val text = stream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
             val json = try {
-                JSONObject(text)
+                val t = text.trim()
+                if (t.startsWith("[")) org.json.JSONArray(t).getJSONObject(0) else JSONObject(t)
             } catch (e: Exception) {
                 throw IllegalStateException("HTTP $code：${text.take(160)}")
             }

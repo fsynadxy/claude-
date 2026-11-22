@@ -8,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.DisplayMetrics
+import android.view.Choreographer
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.ViewConfiguration
@@ -25,7 +26,7 @@ import kotlin.random.Random
  */
 class PetController(private val context: Context, private val wm: WindowManager) {
 
-    private enum class State { IDLE, WALK, ACT, POKE, PAT, DRAG, FALL, LAND, SIT, SLEEP, CLIMB, HANG }
+    private enum class State { IDLE, WALK, ACT, POKE, PAT, DRAG, FALL, LAND, SIT, SLEEP, CLIMB, HANG, FLY }
 
     private val sprites = Sprites(context)
     var onOpenChat: (() -> Unit)? = null
@@ -98,19 +99,26 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private var lastTick = 0L
 
     private val longPress = Runnable { if (touching && state != State.DRAG) startPat() }
-    private val tick = object : Runnable {
-        override fun run() {
+    private var running = false
+    private val tick = object : Choreographer.FrameCallback {
+        override fun doFrame(frameTimeNanos: Long) {
+            if (!running) return
             val now = SystemClock.uptimeMillis()
             val dt = ((now - lastTick) / 1000f).coerceIn(0f, 0.1f)
             lastTick = now
             update(dt)
-            handler.postDelayed(this, 33)
+            Choreographer.getInstance().postFrameCallback(this)
         }
     }
 
+    // keyboard dodging ("zero-gear takeoff")
+    private var imeTop: Int? = null
+    private var keyboardHold = false
+    private val keyboard = KeyboardWatcher(context, wm) { top -> onKeyboard(top) }
+
     private fun dp(v: Float) = v * density
     private fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
-    private val groundTop get() = screenH - bottomInset - winH * PetView.FEET
+    private val groundTop get() = minOf(screenH - bottomInset, imeTop ?: Int.MAX_VALUE) - winH * PetView.FEET
     private val minX get() = -winW * 0.18f
     private val maxX get() = screenW - winW * 0.82f
 
@@ -128,11 +136,16 @@ class PetController(private val context: Context, private val wm: WindowManager)
         act("curtsy", 1.1f, false, 2.4f)
         say(Lines.greeting(), 3.5f)
         lastTick = SystemClock.uptimeMillis()
-        handler.post(tick)
+        running = true
+        Choreographer.getInstance().postFrameCallback(tick)
+        keyboard.start()
     }
 
     fun stop() {
+        running = false
+        Choreographer.getInstance().removeFrameCallback(tick)
         handler.removeCallbacksAndMessages(null)
+        keyboard.stop()
         try {
             wm.removeView(view)
         } catch (_: Exception) {
@@ -151,7 +164,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
         refreshScreen()
         clampToScreen()
         if (state in setOf(State.IDLE, State.WALK, State.SIT, State.SLEEP, State.ACT, State.POKE, State.LAND)) y = groundTop
-        if (state == State.CLIMB || state == State.HANG) startFall()
+        if ((state == State.CLIMB || state == State.HANG) && !keyboardHold) startFall()
         pushLayout(force = true)
     }
 
@@ -231,7 +244,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
             x > screenW * 0.65f -> false
             else -> Random.nextBoolean()
         }
-        enter(State.WALK, "walk", 6f, true, rnd(3f, 8f))
+        enter(State.WALK, "walk", 10f, true, rnd(3f, 8f))
     }
 
     private fun startSit() = enter(State.SIT, "sit", 0f, true, rnd(12f, 25f))
@@ -244,12 +257,40 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private fun startClimb(left: Boolean) {
         climbLeft = left
         x = if (left) 0f else (screenW - winW).toFloat()
-        enter(State.CLIMB, "climb", 3f, true, rnd(4f, 9f))
+        enter(State.CLIMB, "climb", 4f, true, rnd(4f, 9f))
     }
 
     private fun startHang() {
         y = topInset - winH * 0.05f
-        enter(State.HANG, "hang", 1.2f, true, rnd(3f, 6f))
+        enter(State.HANG, "hang", 0f, true, rnd(3f, 6f))
+    }
+
+    private fun startFly() {
+        enter(State.FLY, "fly", 8f)
+        vx = 0f
+        vy = 0f
+        effect("exclaim", 1.0f)
+        say(Lines.pick(Lines.takeoff), 2.2f)
+    }
+
+    private fun onKeyboard(top: Int?) {
+        imeTop = top
+        if (top != null) {
+            val feet = y + winH * PetView.FEET
+            if (Prefs.dodgeKeyboard(context) && feet > top - dp(8f) &&
+                state != State.DRAG && state != State.FLY && state != State.HANG && state != State.CLIMB
+            ) {
+                keyboardHold = true
+                startFly()
+            }
+        } else {
+            if (keyboardHold && state == State.HANG) dur = t + 0.6f   // let go shortly after the keyboard closes
+            keyboardHold = false
+            // she may be standing on top of the keyboard: drop back to the real ground
+            if (state != State.DRAG && state != State.FLY && state != State.HANG && state != State.CLIMB && y < groundTop - 1f) {
+                startFall()
+            }
+        }
     }
 
     private fun startFall() {
@@ -305,6 +346,9 @@ class PetController(private val context: Context, private val wm: WindowManager)
         if (!loop) frameIndex = frameIndex.coerceAtMost(sprites.count(anim) - 1)
         var breath = 0f
         var mirror = false
+        var offY = 0f
+        var rot: Float? = 0f          // null = DRAG/FALL manage rotation themselves
+        var pivot = 0.975f
 
         when (state) {
             State.IDLE -> {
@@ -330,6 +374,22 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 }
             }
             State.ACT -> {
+                when (anim) {
+                    "happy" -> {
+                        val b = abs(sin(t * 7f))
+                        offY = -b * winH * 0.035f
+                        frameIndex = if (b > 0.45f) 0 else 1
+                    }
+                    "dizzy" -> {
+                        rot = 5f * sin(t * 6f)
+                        frameIndex = if (sin(t * 6f) < 0f) 0 else 1
+                    }
+                    "think" -> {
+                        breath = 0.006f * sin(clock * 2f * Math.PI.toFloat() / 3f)
+                        rot = 1.5f * sin(clock * 1.3f)
+                    }
+                    else -> breath = 0.006f * sin(clock * 2f * Math.PI.toFloat() / 3f)
+                }
                 if (t > dur) {
                     val next = afterAct
                     afterAct = null
@@ -338,6 +398,8 @@ class PetController(private val context: Context, private val wm: WindowManager)
             }
             State.POKE -> if (t > dur) idle()
             State.PAT -> {
+                rot = 2.5f * sin(clock * 5f)
+                frameIndex = if (sin(clock * 5f) < 0f) 0 else 1
                 if (clock - patStartedAt > 4f) {
                     frameAnim = "shy"; frameIndex = 0
                     if (clock - patStartedAt < 4f + dt * 1.5f) say(Lines.pick(Lines.shy))
@@ -345,11 +407,13 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 if (((clock - effectStart) > effectLen)) effect(if (Random.nextBoolean()) "flower" else "heart", 1.4f)
             }
             State.DRAG -> {
+                rot = null
                 val target = (-dragVx / dp(900f) * 16f).coerceIn(-16f, 16f) + 3f * sin(clock * 5f)
                 view.rotationDeg += (target - view.rotationDeg) * (dt * 8f).coerceAtMost(1f)
                 dragVx *= (1f - dt * 4f).coerceAtLeast(0f)
             }
             State.FALL -> {
+                rot = null
                 vy = (vy + dp(1900f) * dt).coerceAtMost(dp(2400f))
                 vx *= (1f - dt * 0.8f)
                 x += vx * dt
@@ -366,7 +430,6 @@ class PetController(private val context: Context, private val wm: WindowManager)
             }
             State.LAND -> {
                 frameIndex = if (t < 0.25f) 0 else 1
-                view.rotationDeg = 0f
                 if (t > dur) {
                     if (dizzyPending) {
                         dizzyPending = false
@@ -381,9 +444,13 @@ class PetController(private val context: Context, private val wm: WindowManager)
             State.SIT -> {
                 // mostly frame 1; a short page turn every few seconds
                 frameIndex = if ((t % 7f) > 6.2f) 1 else 0
+                breath = 0.005f * sin(clock * 2f * Math.PI.toFloat() / 3.6f)
                 if (t > dur) if (Random.nextFloat() < 0.4f) startSleep() else act("yawn", 0.8f, false, 2.6f)
             }
             State.SLEEP -> {
+                val phase = sin(clock * 2f * Math.PI.toFloat() / 4.2f)
+                breath = 0.012f * phase
+                frameIndex = if (phase < -0.2f) 1 else 0
                 if (clock - effectStart > effectLen + 1.5f) effect("zzz", 3f)
                 if (t > dur) act("yawn", 0.8f, false, 2.6f)
             }
@@ -397,9 +464,26 @@ class PetController(private val context: Context, private val wm: WindowManager)
                     startFall()
                 }
             }
-            State.HANG -> if (t > dur) {
-                effect("exclaim", 1.2f)
-                startFall()
+            State.HANG -> {
+                val swing = sin(clock * 2.4f)
+                rot = 6f * swing
+                pivot = 0.05f
+                frameIndex = if (swing < 0f) 0 else 1
+                if (!keyboardHold && t > dur) {
+                    effect("exclaim", 1.2f)
+                    startFall()
+                }
+            }
+            State.FLY -> {
+                if (t < 0.14f) {
+                    // anticipation crouch, then full speed at once: zero-gear takeoff
+                    frameAnim = "land"; frameIndex = 0
+                } else {
+                    vy = -dp(2600f)
+                    y += vy * dt
+                    offY = 0f
+                    if (y <= topInset - winH * 0.05f) startHang()
+                }
             }
         }
 
@@ -419,6 +503,13 @@ class PetController(private val context: Context, private val wm: WindowManager)
         if (bmp != null) view.frame = bmp
         view.mirror = mirror
         view.breath = breath
+        view.offsetY = offY
+        if (rot != null) {
+            view.rotationDeg = rot
+            view.pivotFrac = pivot
+        } else {
+            view.pivotFrac = 0.17f
+        }
         view.invalidate()
         pushLayout()
     }

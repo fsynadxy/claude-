@@ -8,7 +8,7 @@ CW, CH, BASE, UNIT = 640, 800, 780, 640   # canvas, feet baseline, standing heig
 #   ref: ('self', cell) -> that cell's bbox height is a standing height
 #        ('borrow', anim, factor) -> reuse another anim's px-scale
 CFG = {
- 'walk':   dict(src='walk', grid=(2, 2), cells=[0, 1, 2, 3], anchor='feet', ref=('self', 0, 1.0)),
+ 'walk':   dict(src='walk8', grid=(4, 2), cells=[0, 1, 2, 3, 4, 5, 6, 7], anchor='feet', ref=('self', 0, 1.0)),
  'drag':   dict(src='drag', grid=(1, 1), cells=[0], anchor='air', ref=('self', 0, 1.0)),
  'fall':   dict(src='fall', grid=(1, 1), cells=[0], anchor='air', ref=('borrow', 'poke', 1.0)),
  'land':   dict(src='land', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 1, 1.0)),
@@ -29,7 +29,8 @@ CFG = {
  'dizzy':  dict(src='dizzy', grid=(2, 1), cells=[0, 1], anchor='feet', ref=('self', 0, 1.0)),
  'bored':  dict(src='bored', grid=(1, 1), cells=[0], anchor='feet', ref=('borrow', 'poke', 1.0)),
  'hair':   dict(src='hair', grid=(1, 1), cells=[0], anchor='feet', ref=('self', 0, 1.0)),
- 'climb':  dict(src='climb', grid=(2, 1), cells=[0, 1], anchor='left', ref=('borrow', 'read', 1.0), wall=True),
+ 'climb':  dict(src='climb4', grid=(4, 1), cells=[0, 1, 2, 3], anchor='left', ref=('borrow', 'read', 1.0), wall=True, perframe_h=636),
+ 'fly':    dict(src='fly', grid=(2, 1), cells=[0, 1], anchor='air', ref=('borrow', 'read', 1.0)),
  'hang':   dict(src='hang', grid=(2, 1), cells=[0, 1], anchor='top', ref=('borrow', 'read', 1.0)),
 }
 ORDER = ['poke', 'read'] + [k for k in CFG if k not in ('poke', 'read')]
@@ -86,6 +87,8 @@ for name in ORDER:
     files = []
     for k, (fr, rr) in enumerate(zip(cells, rel)):
         x0, y0, x1, y1 = fr['bb']
+        if cfg.get('perframe_h'):
+            s = cfg['perframe_h'] / (y1 - y0)
         crop_rgb = fr['fg'][y0:y1, x0:x1]; crop_a = fr['a'][y0:y1, x0:x1]
         nw, nh = max(1, round((x1 - x0) * s)), max(1, round((y1 - y0) * s))
         pre = np.dstack([crop_rgb * crop_a[..., None], crop_a * 255])

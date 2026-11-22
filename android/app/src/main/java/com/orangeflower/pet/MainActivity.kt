@@ -20,6 +20,8 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.text.InputType
 import android.view.View
 import android.widget.Button
+import android.widget.HorizontalScrollView
+import android.widget.Switch
 import android.widget.EditText
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -114,48 +116,104 @@ class MainActivity : Activity() {
 
         // ---- chat settings
         root.addView(sectionTitle("聊天设置"), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
+        root.addView(TextView(this).apply { text = "服务商"; textSize = 13f; setTextColor(muted) },
+            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
+        val providerRow = LinearLayout(this)
+        root.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(providerRow) },
+            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        val keyHint = TextView(this).apply { textSize = 12f; setTextColor(muted) }
+        root.addView(keyHint, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
+
+        // custom provider only: request format + endpoint
+        val customBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val formatGroup = RadioGroup(this).apply { orientation = RadioGroup.HORIZONTAL }
-        val rbAnthropic = RadioButton(this).apply { id = View.generateViewId(); text = "Anthropic 格式"; setTextColor(ink) }
         val rbOpenAi = RadioButton(this).apply { id = View.generateViewId(); text = "OpenAI 兼容格式"; setTextColor(ink) }
-        formatGroup.addView(rbAnthropic)
+        val rbAnthropic = RadioButton(this).apply { id = View.generateViewId(); text = "Anthropic 格式"; setTextColor(ink) }
         formatGroup.addView(rbOpenAi)
-        root.addView(formatGroup)
-        val baseField = input("接口地址", ChatConfig.base(this), password = false)
-        val modelField = input("模型", ChatConfig.model(this), password = false)
-        val keyField = input("API Key", ChatConfig.key(this), password = true)
+        formatGroup.addView(rbAnthropic)
+        if (ChatConfig.customFormat(this) == ChatConfig.FORMAT_ANTHROPIC) rbAnthropic.isChecked = true else rbOpenAi.isChecked = true
+        val baseField = input("接口地址，例如 https://example.com/v1", ChatConfig.customBase(this), password = false)
+        customBox.addView(formatGroup)
+        customBox.addView(baseField, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(customBox, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+
+        val modelField = input("模型", "", password = false)
+        root.addView(modelField, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
+        val modelRow = LinearLayout(this)
+        root.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(modelRow) },
+            LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
+        val keyField = input("API Key", "", password = true)
         val userField = input("她怎么称呼你（可空，默认“你”）", ChatConfig.rawUserName(this), password = false)
-        if (ChatConfig.format(this) == ChatConfig.FORMAT_OPENAI) rbOpenAi.isChecked = true else rbAnthropic.isChecked = true
-        formatGroup.setOnCheckedChangeListener { _, checked ->
-            // swap the built-in OpenCode defaults when switching formats, keep anything custom
-            val toOpenAi = checked == rbOpenAi.id
-            val base = baseField.text.toString().trim()
-            val model = modelField.text.toString().trim()
-            if (toOpenAi) {
-                if (base == ChatConfig.DEFAULT_ANTHROPIC_BASE || base.isEmpty()) baseField.setText(ChatConfig.DEFAULT_OPENAI_BASE)
-                if (model == ChatConfig.DEFAULT_ANTHROPIC_MODEL || model.isEmpty()) modelField.setText(ChatConfig.DEFAULT_OPENAI_MODEL)
-            } else {
-                if (base == ChatConfig.DEFAULT_OPENAI_BASE || base.isEmpty()) baseField.setText(ChatConfig.DEFAULT_ANTHROPIC_BASE)
-                if (model == ChatConfig.DEFAULT_OPENAI_MODEL || model.isEmpty()) modelField.setText(ChatConfig.DEFAULT_ANTHROPIC_MODEL)
-            }
-        }
-        listOf(baseField, modelField, keyField, userField).forEach {
+        listOf(keyField, userField).forEach {
             root.addView(it, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
         }
+
+        // unsaved edits per provider, so switching back and forth doesn't lose typing
+        val editedKeys = ChatConfig.providers.associate { it.id to ChatConfig.keyFor(this, it.id) }.toMutableMap()
+        val editedModels = ChatConfig.providers.associate { it.id to ChatConfig.modelFor(this, it) }.toMutableMap()
+        var selected = ChatConfig.provider(this)
+        val chips = mutableMapOf<String, Button>()
+
+        fun showProvider(p: Provider) {
+            editedKeys[selected.id] = keyField.text.toString()
+            editedModels[selected.id] = modelField.text.toString()
+            selected = p
+            chips.forEach { (id, b) -> styleChip(b, id == p.id) }
+            keyHint.text = p.keyHint
+            customBox.visibility = if (p.id == ChatConfig.CUSTOM) View.VISIBLE else View.GONE
+            modelField.setText(editedModels[p.id] ?: "")
+            keyField.setText(editedKeys[p.id] ?: "")
+            modelRow.removeAllViews()
+            p.models.forEach { m ->
+                modelRow.addView(Button(this).apply {
+                    text = m
+                    isAllCaps = false
+                    textSize = 12f
+                    setTextColor(accent)
+                    background = null
+                    minWidth = 0
+                    minimumWidth = 0
+                    minHeight = dp(32)
+                    minimumHeight = dp(32)
+                    setPadding(dp(8), 0, dp(8), 0)
+                    setOnClickListener { modelField.setText(m) }
+                })
+            }
+        }
+        ChatConfig.providers.forEach { p ->
+            val chip = Button(this).apply {
+                text = p.label
+                isAllCaps = false
+                textSize = 13f
+                minWidth = 0
+                minimumWidth = 0
+                minHeight = dp(34)
+                minimumHeight = dp(34)
+                setPadding(dp(14), 0, dp(14), 0)
+                setOnClickListener { showProvider(p) }
+            }
+            chips[p.id] = chip
+            providerRow.addView(chip, LinearLayout.LayoutParams(WRAP_CONTENT, dp(34)).apply { rightMargin = dp(6) })
+        }
+        // first render without overwriting the stored values
+        editedKeys[selected.id]?.let { keyField.setText(it) }
+        editedModels[selected.id]?.let { modelField.setText(it) }
+        showProvider(selected)
+
         val testResult = TextView(this).apply { textSize = 13f; setTextColor(muted) }
         fun saveChat() = ChatConfig.save(
-            this,
-            if (rbOpenAi.isChecked) ChatConfig.FORMAT_OPENAI else ChatConfig.FORMAT_ANTHROPIC,
-            baseField.text.toString(), modelField.text.toString(), keyField.text.toString(), userField.text.toString(),
+            this, selected.id, modelField.text.toString(), keyField.text.toString(), userField.text.toString(),
+            baseField.text.toString(), if (rbAnthropic.isChecked) ChatConfig.FORMAT_ANTHROPIC else ChatConfig.FORMAT_OPENAI,
         )
         val chatButtons = LinearLayout(this)
         chatButtons.addView(outlineButton("保存") {
             saveChat()
-            testResult.text = "已保存"
+            testResult.text = "已保存，现在使用 ${selected.label}"
         }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { rightMargin = dp(8) })
         chatButtons.addView(outlineButton("保存并测试") {
             saveChat()
             if (!ChatConfig.isReady(this)) {
-                testResult.text = "地址、模型和 Key 都要填写"
+                testResult.text = if (selected.id == ChatConfig.CUSTOM) "接口地址、模型和 Key 都要填写" else "模型和 Key 都要填写"
                 return@outlineButton
             }
             testResult.text = "正在问她……"
@@ -167,9 +225,19 @@ class MainActivity : Activity() {
         root.addView(chatButtons, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(10) })
         root.addView(testResult, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
         root.addView(TextView(this).apply {
-            text = "用 OpenCode 的 Key 时，保持默认的地址和模型即可。Key 只保存在这台手机的应用数据里。"
+            text = "选好服务商后只需填 Key；模型可以点下面的推荐，也可以自己填（以服务商控制台里的名字为准）。每家的 Key 分开保存，只存在这台手机的应用数据里。"
             textSize = 12f
             setTextColor(muted)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+
+        // ---- desktop behaviour
+        root.addView(sectionTitle("桌面行为"), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
+        root.addView(Switch(this).apply {
+            text = "键盘弹出时自动起飞（避开键盘）"
+            textSize = 14f
+            setTextColor(ink)
+            isChecked = Prefs.dodgeKeyboard(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> Prefs.setDodgeKeyboard(this@MainActivity, on) }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
 
         // ---- character cards
@@ -193,6 +261,7 @@ class MainActivity : Activity() {
                 "· 长按：摸摸头，摸久了会害羞",
                 "· 拖动：把她拎起来，松手会掉下去；使劲晃会晕",
                 "· 不理她时：她会散步、看书、喝茶、坐下打瞌睡，偶尔爬上屏幕边缘",
+                "· 键盘弹出时：她会零档起飞，挂到屏幕顶上让开，键盘收起后再落回来",
                 "· 通知栏里点“收起”就能让她回去",
             ).joinToString("\n")
             textSize = 14f
@@ -224,6 +293,15 @@ class MainActivity : Activity() {
         setHintTextColor(muted)
         inputType = if (password) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         else InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+    }
+
+    private fun styleChip(b: Button, on: Boolean) {
+        b.setTextColor(if (on) Color.WHITE else ink)
+        b.background = GradientDrawable().apply {
+            cornerRadius = dp(17).toFloat()
+            setColor(if (on) accent else Color.WHITE)
+            setStroke(dp(1), if (on) accent else Color.parseColor("#E6D8CC"))
+        }
     }
 
     private fun outlineButton(label: String, onClick: () -> Unit) = Button(this).apply {
