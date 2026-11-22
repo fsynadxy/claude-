@@ -253,6 +253,18 @@ class MainActivity : Activity() {
             setTextColor(muted)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
         root.addView(Switch(this).apply {
+            text = "连点她三下：让她看看现在的屏幕"
+            textSize = 14f
+            setTextColor(ink)
+            isChecked = Prefs.tripleTapLook(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> Prefs.setTripleTapLook(this@MainActivity, on) }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(TextView(this).apply {
+            text = "系统每次都会弹出截屏确认，点“立即开始”后截一张图（她自己会先藏起来），发给当前聊天设置里的模型，需要模型支持识图。截图不会保存在手机上。"
+            textSize = 12f
+            setTextColor(muted)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
+        root.addView(Switch(this).apply {
             text = "朗读她的回复（离线语音）"
             textSize = 14f
             setTextColor(ink)
@@ -295,7 +307,8 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = listOf(
                 "怎么和她相处",
-                "· 单击：她头顶会弹出输入框，和她聊天；输入框开着时再点她是戳她，连着戳会生气",
+                "· 单击：她头顶会弹出输入框，和她聊天；双击：戳她，连着戳会生气",
+                "· 连点三下：让她看看现在的屏幕（识图）",
                 "· 输入框右边的 ⤢ 可以打开完整的聊天记录",
                 "· 长按：摸摸头，摸久了会害羞；摸头、戳、甩她都会由模型按角色性格回应",
                 "· 她的表情会跟着回复内容变化（开心、害羞、生气、委屈、惊讶、思考）",

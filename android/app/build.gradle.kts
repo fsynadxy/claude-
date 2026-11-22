@@ -7,7 +7,7 @@ plugins {
 }
 
 // Shown version; CI reads it for the APK name and the release tag.
-val appVersion = "1.1.1"
+val appVersion = "1.2.0"
 // CI run number becomes the version code, so each new APK installs over the previous one.
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
@@ -107,8 +107,13 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 dependencies {
     implementation(files(sherpaAar))
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }

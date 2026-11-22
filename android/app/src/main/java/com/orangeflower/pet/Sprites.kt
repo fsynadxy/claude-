@@ -39,7 +39,7 @@ class Sprites(private val context: Context) {
     fun frame(anim: String, index: Int): Bitmap? {
         val n = count(anim)
         if (n == 0 || frameHeight <= 0) return null
-        val name = String.format("%s_%02d", anim, Math.floorMod(index, n) + 1)
+        val name = String.format(java.util.Locale.US, "%s_%02d", anim, Math.floorMod(index, n) + 1)
         return load("pet/$name.webp", frameHeight, fitLongestSide = false)
     }
 

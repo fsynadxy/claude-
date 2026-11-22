@@ -1,7 +1,6 @@
 package com.orangeflower.pet
 
 import android.content.Context
-import android.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -93,7 +92,7 @@ object CardStore {
 object CardImport {
 
     fun parse(bytes: ByteArray): Card {
-        val json = if (isPng(bytes)) JSONObject(pngCardJson(bytes)) else JSONObject(String(bytes, Charsets.UTF_8).trimStart('﻿'))
+        val json = if (isPng(bytes)) JSONObject(pngCardJson(bytes)) else JSONObject(String(bytes, Charsets.UTF_8).trimStart('\uFEFF'))
         val data = json.optJSONObject("data") ?: json
         val name = data.optString("name").ifBlank { data.optString("char_name") }.ifBlank { "未命名角色" }
         val sections = listOf(
@@ -154,7 +153,7 @@ object CardImport {
         }
         val payload = found["ccv3"] ?: found["chara"] ?: throw IllegalArgumentException("这张图片里没有找到角色卡数据")
         val trimmed = payload.trim()
-        return if (trimmed.startsWith("{")) trimmed else String(Base64.decode(trimmed, Base64.DEFAULT), Charsets.UTF_8)
+        return if (trimmed.startsWith("{")) trimmed else String(java.util.Base64.getMimeDecoder().decode(trimmed), Charsets.UTF_8)
     }
 
     private fun ByteArray.indexOfZero(from: Int = 0): Int {

@@ -127,6 +127,18 @@ object VoiceClient {
         })
     }
 
+    /** Unbinds from the speech service (when the pet is put away); it is bound again on next use. */
+    fun release() {
+        if (!binding) return
+        try {
+            app?.unbindService(connection)
+        } catch (_: Exception) {
+        }
+        binding = false
+        service = null
+        queue.clear()
+    }
+
     /** Stops speaking; the pending callback still gets onDone(false) so the bubble can finish. */
     fun stop() {
         gen++

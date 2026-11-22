@@ -44,6 +44,9 @@ class PetService : Service() {
             val wm = ctx.getSystemService(WindowManager::class.java)
             controller = PetController(ctx, wm).also {
                 it.onOpenChat = { openChat() }
+                it.onRequestCapture = {
+                    startActivity(Intent(this, CaptureActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
                 it.onOpenSettings = {
                     startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
@@ -80,7 +83,28 @@ class PetService : Service() {
         super.onDestroy()
     }
 
-    private fun startInForeground() {
+    private fun handleCapture(resultCode: Int, data: Intent?) {
+        val c = controller ?: return
+        if (resultCode != android.app.Activity.RESULT_OK || data == null) {
+            c.onScreenshot(null, cancelled = true)
+            return
+        }
+        try {
+            startInForeground(capturing = true)
+        } catch (e: Exception) {
+            Diagnostics.note(this, "截屏前台服务启动失败：${e.message}")
+            c.onScreenshot(null, cancelled = false)
+            return
+        }
+        val dm = resources.displayMetrics
+        val (w, h) = c.screenSize()
+        ScreenGrabber.grab(this, resultCode, data, w, h, dm.densityDpi) { bmp ->
+            try { startInForeground(capturing = false) } catch (_: Exception) {}
+            controller?.onScreenshot(bmp, cancelled = false)
+        }
+    }
+
+    private fun startInForeground(capturing: Boolean = false) {
         val nm = getSystemService(NotificationManager::class.java)
         if (nm.getNotificationChannel(CHANNEL) == null) {
             nm.createNotificationChannel(
@@ -108,10 +132,15 @@ class PetService : Service() {
             .addAction(Notification.Action.Builder(null, "聊天", chat).build())
             .addAction(Notification.Action.Builder(null, "收起", stop).build())
             .build()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-        } else {
-            startForeground(NOTIFICATION_ID, notification)
+        when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> startForeground(
+                NOTIFICATION_ID, notification,
+                if (capturing) ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE or ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                else ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+            )
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && capturing ->
+                startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+            else -> startForeground(NOTIFICATION_ID, notification)
         }
     }
 
@@ -132,6 +161,11 @@ class PetService : Service() {
             instance?.controller?.speak(text)
         }
 
+        /** Result of the screen-capture consent dialog (main thread). */
+        fun onCaptureResult(resultCode: Int, data: Intent?) {
+            instance?.handleCapture(resultCode, data)
+        }
+
         /** Puts the pet into a thinking pose while a reply is on its way (main thread). */
         fun thinking() {
             instance?.controller?.thinking()
@@ -149,6 +183,13 @@ object Prefs {
 
     fun setModelReacts(context: Context, value: Boolean) {
         context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("model_reacts", value).apply()
+    }
+
+    fun tripleTapLook(context: Context): Boolean =
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).getBoolean("triple_look", true)
+
+    fun setTripleTapLook(context: Context, value: Boolean) {
+        context.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putBoolean("triple_look", value).apply()
     }
 
     fun dodgeKeyboard(context: Context): Boolean =

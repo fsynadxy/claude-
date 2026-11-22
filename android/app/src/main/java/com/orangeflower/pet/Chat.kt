@@ -169,7 +169,9 @@ object ChatClient {
             "\n每次回复的最开头，用一个标签标出你此刻的表情，只能从【开心】【害羞】【生气】【委屈】【惊讶】【思考】【平静】里选一个，" +
             "例如：【开心】嘿嘿，谢谢。标签只在开头出现一次。" +
             "\n当{{user}}的消息以【互动】开头时，表示{{user}}在屏幕上对你做了这个动作，而不是在说话。" +
-            "用一两句简短、符合你性格的反应回应，不要复述动作本身。"
+            "用一两句简短、符合你性格的反应回应，不要复述动作本身。" +
+            "\n当{{user}}的消息以【识图】开头时，附带的图片是{{user}}手机当前屏幕的截图（截图里没有你自己）。" +
+            "像陪在旁边的朋友一样，简短说说你看到了什么、{{user}}可能在做什么，有用的话顺便给一点建议；看不清或不确定就直说。"
 
     fun systemPrompt(c: Context, card: Card): String {
         val user = ChatConfig.userName(c)
@@ -179,7 +181,7 @@ object ChatClient {
     }
 
     /** Sends [history] (ending with the user's message) and calls [done] on the main thread. */
-    fun send(c: Context, card: Card, history: List<Msg>, done: (Result<String>) -> Unit) {
+    fun send(c: Context, card: Card, history: List<Msg>, image: String? = null, done: (Result<String>) -> Unit) {
         val app = c.applicationContext
         val format = ChatConfig.format(app)
         val base = ChatConfig.base(app).trimEnd('/')
@@ -189,15 +191,15 @@ object ChatClient {
         val turns = normalize(history.takeLast(16))
         pool.execute {
             val result = runCatching {
-                if (format == ChatConfig.FORMAT_OPENAI) openAi(base, model, key, system, turns)
-                else anthropic(base, model, key, system, turns)
+                if (format == ChatConfig.FORMAT_OPENAI) openAi(base, model, key, system, turns, image)
+                else anthropic(base, model, key, system, turns, image)
             }
             main.post { done(result) }
         }
     }
 
     /** Merges consecutive same-role turns and drops leading assistant turns (APIs expect a user turn first). */
-    private fun normalize(list: List<Msg>): List<Msg> {
+    internal fun normalize(list: List<Msg>): List<Msg> {
         val out = mutableListOf<Msg>()
         for (m in list) {
             if (out.isEmpty() && m.role != "user") continue
@@ -210,10 +212,20 @@ object ChatClient {
         return out
     }
 
-    private fun anthropic(base: String, model: String, key: String, system: String, turns: List<Msg>): String {
+    private fun anthropic(base: String, model: String, key: String, system: String, turns: List<Msg>, image: String?): String {
         val url = if (base.endsWith("/messages")) base else "$base/messages"
         val msgs = JSONArray()
-        turns.forEach { msgs.put(JSONObject().put("role", it.role).put("content", it.content)) }
+        turns.forEachIndexed { i, m ->
+            if (image != null && i == turns.lastIndex && m.role == "user") {
+                val content = JSONArray()
+                    .put(JSONObject().put("type", "image").put("source",
+                        JSONObject().put("type", "base64").put("media_type", "image/jpeg").put("data", image)))
+                    .put(JSONObject().put("type", "text").put("text", m.content))
+                msgs.put(JSONObject().put("role", "user").put("content", content))
+            } else {
+                msgs.put(JSONObject().put("role", m.role).put("content", m.content))
+            }
+        }
         val body = JSONObject()
             .put("model", model)
             .put("max_tokens", 600)
@@ -231,10 +243,19 @@ object ChatClient {
         return sb.toString().trim().ifEmpty { throw IllegalStateException("她没有说话（空回复）") }
     }
 
-    private fun openAi(base: String, model: String, key: String, system: String, turns: List<Msg>): String {
+    private fun openAi(base: String, model: String, key: String, system: String, turns: List<Msg>, image: String?): String {
         val url = if (base.endsWith("/chat/completions")) base else "$base/chat/completions"
         val msgs = JSONArray().put(JSONObject().put("role", "system").put("content", system))
-        turns.forEach { msgs.put(JSONObject().put("role", it.role).put("content", it.content)) }
+        turns.forEachIndexed { i, m ->
+            if (image != null && i == turns.lastIndex && m.role == "user") {
+                val content = JSONArray()
+                    .put(JSONObject().put("type", "text").put("text", m.content))
+                    .put(JSONObject().put("type", "image_url").put("image_url", JSONObject().put("url", "data:image/jpeg;base64,$image")))
+                msgs.put(JSONObject().put("role", "user").put("content", content))
+            } else {
+                msgs.put(JSONObject().put("role", m.role).put("content", m.content))
+            }
+        }
         // OpenAI's newer models only accept max_completion_tokens; most compatible APIs use max_tokens
         val official = base.contains("api.openai.com")
         fun body(newParam: Boolean) = JSONObject().put("model", model).put("messages", msgs)

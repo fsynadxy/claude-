@@ -2,6 +2,7 @@ package com.orangeflower.pet
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.graphics.Rect
 import android.os.Build
@@ -12,6 +13,7 @@ import android.util.DisplayMetrics
 import android.view.Choreographer
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import android.view.WindowInsets
 import android.view.WindowManager
@@ -136,6 +138,21 @@ class PetController(private val context: Context, private val wm: WindowManager)
     }
     private var voiceErrorShown = false
     var onOpenSettings: (() -> Unit)? = null
+    var onRequestCapture: (() -> Unit)? = null
+
+    // multi-tap: 1 = chat input, 2 = poke, 3 = look at the screen
+    private var tapSeq = 0
+    private val tapResolve = Runnable {
+        val n = tapSeq
+        tapSeq = 0
+        when {
+            n >= 3 && Prefs.tripleTapLook(context) -> lookAtScreen()
+            n >= 2 -> poke()
+            else -> openChatInput()
+        }
+    }
+    private val recentPetTaps = ArrayDeque<Float>()
+    private var looking = false
 
     private fun dp(v: Float) = v * density
     private fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
@@ -172,6 +189,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
         chatInput?.close()
         bubble.detach()
         VoiceClient.stop()
+        VoiceClient.release()   // lets the system reclaim the speech process and its model
         try {
             wm.removeView(view)
         } catch (_: Exception) {
@@ -411,7 +429,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
                     }
                 }
                 if (blinkT > 0.22f) nextBlink = clock + rnd(2.5f, 6f)
-                if (t > idleFor && !touching && chatInput == null && !bubble.speaking) pickNext()
+                if (t > idleFor && !touching && chatInput == null && !bubble.speaking && !looking) pickNext()
             }
             State.WALK -> {
                 mirror = facingRight
@@ -455,7 +473,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 frameIndex = (clock * 5f).toInt()
                 if (clock - patStartedAt > 4f) {
                     frameAnim = "shy"; frameIndex = 0
-                    if (clock - patStartedAt < 4f + dt * 1.5f) say(Lines.pick(Lines.shy))
+                    if (!modelReacts && clock - patStartedAt < 4f + dt * 1.5f) say(Lines.pick(Lines.shy))
                 }
                 if (((clock - effectStart) > effectLen)) effect(if (Random.nextBoolean()) "flower" else "heart", 1.4f)
             }
@@ -541,10 +559,14 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 } else {
                     if (flyHop) {
                         val target = groundTop
-                        y -= dp(1800f) * dt
-                        if (y <= target) {
-                            y = target
-                            startLand()
+                        if (target > y + 1f) {
+                            startFall()           // the keyboard closed mid-hop: drop down naturally
+                        } else {
+                            y -= dp(1800f) * dt
+                            if (y <= target) {
+                                y = target
+                                startLand()
+                            }
                         }
                     } else {
                         vy = -dp(2600f)
@@ -594,7 +616,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
     }
 
     private fun say(text: String, seconds: Float = 3.2f) {
-        if (bubble.speaking) return
+        if (!running || looking || bubble.speaking) return
         bubble.showLine(text, seconds)
         talkUntil = clock + minOf(text.length * 0.12f, 1.8f)
     }
@@ -603,9 +625,9 @@ class PetController(private val context: Context, private val wm: WindowManager)
 
     private val busy get() = state == State.DRAG || state == State.FALL || state == State.CLIMB || state == State.HANG
 
-    /** Shows the first sentence of a chat reply in the bubble; the full text stays in the chat panel. */
     /** Says a whole chat reply in the floating bubble, voiced sentence by sentence when TTS is on. */
     fun speak(text: String) {
+        if (!running) return
         val (emotion, body) = Emotion.parse(text)
         val clean = body.ifBlank { "……" }
         val parts = Voice.sentences(clean).ifEmpty { listOf(clean) }
@@ -663,7 +685,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
             petRect = { petRect() },
             onSend = { sendChat(it) },
             onExpand = { onOpenChat?.invoke() },
-            onPetTap = { poke() },
+            onPetTap = { onPetTapWhileChatting() },
             onKeyboard = { top -> onChatKeyboard(top) },
             onClosed = { chatInput = null },
         ).also { it.open(screenW) }
@@ -784,7 +806,86 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 react("在你打瞌睡的时候把你叫醒了", Lines.wake)
             }
             State.DRAG, State.FALL, State.FLY -> Unit
-            else -> openChatInput()
+            else -> {
+                tapSeq++
+                handler.removeCallbacks(tapResolve)
+                if (tapSeq >= 3) handler.post(tapResolve) else handler.postDelayed(tapResolve, 280)
+            }
+        }
+    }
+
+    /** Taps on her while the input bubble is open: pokes, and three quick ones look at the screen. */
+    private fun onPetTapWhileChatting() {
+        recentPetTaps.addLast(clock)
+        while (recentPetTaps.isNotEmpty() && clock - recentPetTaps.first() > 0.8f) recentPetTaps.removeFirst()
+        if (recentPetTaps.size >= 3 && Prefs.tripleTapLook(context)) {
+            recentPetTaps.clear()
+            chatInput?.close()
+            lookAtScreen()
+        } else {
+            poke()
+        }
+    }
+
+    fun screenSize(): Pair<Int, Int> = screenW to screenH
+
+    /** Triple tap: hide, ask the system for a one-off screen capture, and let the model look at it. */
+    private fun lookAtScreen() {
+        if (looking) return
+        if (!ChatConfig.isReady(context)) {
+            say("先在设置里填好 API，我才能帮你看屏幕。", 3.5f)
+            return
+        }
+        looking = true
+        handler.removeCallbacks(pokeReaction)
+        pokeBurst = 0
+        chatInput?.close()
+        bubble.hide()
+        view.visibility = View.INVISIBLE
+        handler.postDelayed(lookTimeout, 60_000)
+        onRequestCapture?.invoke() ?: onScreenshot(null, cancelled = true)
+    }
+
+    // if the consent dialog is left without an answer, come back after a minute
+    private val lookTimeout = Runnable { if (looking) onScreenshot(null, cancelled = true) }
+
+    fun onScreenshot(bmp: Bitmap?, cancelled: Boolean) {
+        handler.removeCallbacks(lookTimeout)
+        if (!looking && bmp == null) return
+        looking = false
+        view.visibility = View.VISIBLE
+        if (bmp == null) {
+            say(if (cancelled) "那就不看啦。" else "……没看清，再试一次？", 2.6f)
+            return
+        }
+        val image = try {
+            ScreenGrabber.toJpegBase64(bmp)
+        } catch (e: Exception) {
+            null
+        } finally {
+            bmp.recycle()
+        }
+        if (image == null) {
+            say("……没看清，再试一次？", 2.6f)
+            return
+        }
+        effect("question", 1.4f)
+        val card = CardStore.active(context)
+        val history = ChatStore.load(context, card.id)
+        history.add(Msg("user", "【识图】（给你看了一眼现在的屏幕）"))
+        ChatStore.save(context, card.id, history)
+        thinking()
+        ChatClient.send(context, card, history, image) { result ->
+            result.onSuccess { reply ->
+                val h = ChatStore.load(context, card.id)
+                h.add(Msg("assistant", reply))
+                ChatStore.save(context, card.id, h)
+                speak(reply)
+            }.onFailure { e ->
+                val m = e.message ?: ""
+                speak(if (m.contains("image", true) || m.contains("vision", true) || m.contains("400"))
+                    "这个模型好像看不了图片，换一个支持识图的模型试试？" else "……好像没连上。（${m.take(60)}）")
+            }
         }
     }
 
