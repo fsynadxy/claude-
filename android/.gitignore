@@ -6,3 +6,7 @@ local.properties
 captures/
 out/
 .cache/
+
+# signing keys never go in the repo
+*.jks
+*.keystore

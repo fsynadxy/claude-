@@ -7,7 +7,7 @@ plugins {
 }
 
 // Shown version; CI reads it for the APK name and the release tag.
-val appVersion = "1.2.0"
+val appVersion = "1.2.1"
 // CI run number becomes the version code, so each new APK installs over the previous one.
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
@@ -80,23 +80,24 @@ android {
         noCompress += listOf("onnx")
     }
 
-    // A fixed, non-secret debug-style key (password "android") so CI builds can update each other.
+    // Release signing comes from the environment (GitHub Actions secrets); no key lives in the repo.
+    val keystorePath = System.getenv("CLAU_KEYSTORE")
     signingConfigs {
-        create("shared") {
-            storeFile = file("pet-debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
+        if (keystorePath != null) {
+            create("release") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("CLAU_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("CLAU_KEY_ALIAS") ?: "clauniang"
+                keyPassword = System.getenv("CLAU_KEY_PASSWORD") ?: System.getenv("CLAU_KEYSTORE_PASSWORD")
+            }
         }
     }
 
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("shared")
-        }
-        getByName("debug") {
-            signingConfig = signingConfigs.getByName("shared")
+            // without the secrets, release builds use the local debug key (fine for testing, never for publishing)
+            signingConfig = if (keystorePath != null) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
         }
     }
 
