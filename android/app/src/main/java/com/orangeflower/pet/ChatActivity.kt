@@ -110,15 +110,26 @@ class ChatActivity : Activity() {
         row.addView(sendButton, LinearLayout.LayoutParams(dp(72), dp(40)).apply { leftMargin = dp(8) })
         panel.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
+        // Keyboard: use IME insets where available, and also measure the visible frame, because
+        // translucent windows on some phones are neither resized nor given IME insets.
+        var insetBottom = 0
+        fun applyBottom() {
+            val r = android.graphics.Rect()
+            root.getWindowVisibleDisplayFrame(r)
+            val covered = (root.rootView.height - r.bottom).coerceAtLeast(0)
+            val bottom = maxOf(insetBottom, covered)
+            if (panel.paddingBottom != dp(12) + bottom) panel.setPadding(dp(16), dp(14), dp(16), dp(12) + bottom)
+        }
         root.setOnApplyWindowInsetsListener { _, insets ->
-            val bottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            insetBottom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 insets.getInsets(WindowInsets.Type.ime() or WindowInsets.Type.navigationBars()).bottom
             } else {
                 @Suppress("DEPRECATION") insets.systemWindowInsetBottom
             }
-            panel.setPadding(dp(16), dp(14), dp(16), dp(12) + bottom)
+            applyBottom()
             insets
         }
+        root.viewTreeObserver.addOnGlobalLayoutListener { applyBottom() }
         setContentView(root)
     }
 

@@ -239,6 +239,21 @@ class MainActivity : Activity() {
             isChecked = Prefs.dodgeKeyboard(this@MainActivity)
             setOnCheckedChangeListener { _, on -> Prefs.setDodgeKeyboard(this@MainActivity, on) }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(Switch(this).apply {
+            text = "朗读她的回复（离线语音）"
+            textSize = 14f
+            setTextColor(ink)
+            isChecked = Voice.enabled(this@MainActivity)
+            setOnCheckedChangeListener { _, on ->
+                Voice.setEnabled(this@MainActivity, on)
+                if (on) Voice.prepare(this@MainActivity) else Voice.stop()
+            }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(TextView(this).apply {
+            text = "语音在手机上离线合成（开源 sherpa-onnx + piper 中文女声 huayan），不联网、不收费。第一次朗读前会把约 65 MB 的语音模型解压到应用目录，需要几秒钟。"
+            textSize = 12f
+            setTextColor(muted)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
 
         // ---- character cards
         root.addView(sectionTitle("角色卡"), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
@@ -256,8 +271,8 @@ class MainActivity : Activity() {
         root.addView(TextView(this).apply {
             text = listOf(
                 "怎么和她相处",
-                "· 单击：戳她一下；连着戳会生气",
-                "· 双击：和她聊天（先在下面填好聊天设置）",
+                "· 单击：她头顶会弹出输入框，和她聊天；输入框开着时再点她是戳她，连着戳会生气",
+                "· 输入框右边的 ⤢ 可以打开完整的聊天记录",
                 "· 长按：摸摸头，摸久了会害羞",
                 "· 拖动：把她拎起来，松手会掉下去；使劲晃会晕",
                 "· 不理她时：她会散步、看书、喝茶、坐下打瞌睡，偶尔爬上屏幕边缘",

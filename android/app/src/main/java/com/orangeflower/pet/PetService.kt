@@ -44,6 +44,9 @@ class PetService : Service() {
             val wm = ctx.getSystemService(WindowManager::class.java)
             controller = PetController(ctx, wm).also {
                 it.onOpenChat = { openChat() }
+                it.onOpenSettings = {
+                    startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
                 it.start(Prefs.size(this))
             }
             running = true
@@ -99,7 +102,7 @@ class PetService : Service() {
         val notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_flower)
             .setContentTitle("Clau娘在屏幕上陪着你")
-            .setContentText("双击她可以聊天，点“收起”让她回去休息")
+            .setContentText("点她一下就能聊天，点“收起”让她回去休息")
             .setContentIntent(open)
             .setOngoing(true)
             .addAction(Notification.Action.Builder(null, "聊天", chat).build())

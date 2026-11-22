@@ -3,6 +3,7 @@ package com.orangeflower.pet
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -114,7 +115,13 @@ class PetController(private val context: Context, private val wm: WindowManager)
     // keyboard dodging ("zero-gear takeoff")
     private var imeTop: Int? = null
     private var keyboardHold = false
-    private val keyboard = KeyboardWatcher(context, wm) { top -> onKeyboard(top) }
+    private val keyboard = KeyboardWatcher(context, wm) { top -> if (chatInput == null) onKeyboard(top) }
+
+    // chat: input bubble, speech bubble, voice
+    private val bubble = SpeechBubble(context, wm).also { b -> b.onSkip = { Voice.stop() } }
+    private var chatInput: ChatInput? = null
+    private var flyHop = false
+    var onOpenSettings: (() -> Unit)? = null
 
     private fun dp(v: Float) = v * density
     private fun rnd(a: Float, b: Float) = a + Random.nextFloat() * (b - a)
@@ -139,6 +146,8 @@ class PetController(private val context: Context, private val wm: WindowManager)
         running = true
         Choreographer.getInstance().postFrameCallback(tick)
         keyboard.start()
+        bubble.attach()
+        if (Voice.enabled(context)) Voice.prepare(context)
     }
 
     fun stop() {
@@ -146,6 +155,9 @@ class PetController(private val context: Context, private val wm: WindowManager)
         Choreographer.getInstance().removeFrameCallback(tick)
         handler.removeCallbacksAndMessages(null)
         keyboard.stop()
+        chatInput?.close()
+        bubble.detach()
+        Voice.stop()
         try {
             wm.removeView(view)
         } catch (_: Exception) {
@@ -267,10 +279,29 @@ class PetController(private val context: Context, private val wm: WindowManager)
 
     private fun startFly() {
         enter(State.FLY, "fly", 8f)
+        flyHop = false
         vx = 0f
         vy = 0f
         effect("exclaim", 1.0f)
         say(Lines.pick(Lines.takeoff), 2.2f)
+    }
+
+    /** Hops up onto a higher ground (the top of the keyboard while chatting). */
+    private fun startHop() {
+        enter(State.FLY, "fly", 8f)
+        flyHop = true
+        vx = 0f
+        vy = 0f
+    }
+
+    /** Keyboard reported by the chat input: stand on top of it so the input bubble stays visible. */
+    private fun onChatKeyboard(top: Int?) {
+        imeTop = top
+        if (top != null) {
+            if (y > groundTop + 1f && state != State.DRAG && state != State.FLY) startHop()
+        } else if (state != State.DRAG && state != State.FLY && state != State.HANG && state != State.CLIMB && y < groundTop - 1f) {
+            startFall()
+        }
     }
 
     private fun onKeyboard(top: Int?) {
@@ -360,7 +391,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
                     clock < talkUntil && (clock * 7f).toInt() % 2 == 1 -> { frameAnim = "talk"; frameIndex = 0 }
                 }
                 if (blinkT > 0.22f) nextBlink = clock + rnd(2.5f, 6f)
-                if (t > idleFor && !touching) pickNext()
+                if (t > idleFor && !touching && chatInput == null && !bubble.speaking) pickNext()
             }
             State.WALK -> {
                 mirror = facingRight
@@ -475,14 +506,22 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 }
             }
             State.FLY -> {
-                if (t < 0.14f) {
+                if (t < (if (flyHop) 0.08f else 0.14f)) {
                     // anticipation crouch, then full speed at once: zero-gear takeoff
                     frameAnim = "land"; frameIndex = 0
                 } else {
-                    vy = -dp(2600f)
-                    y += vy * dt
-                    offY = 0f
-                    if (y <= topInset - winH * 0.05f) startHang()
+                    if (flyHop) {
+                        val target = groundTop
+                        y -= dp(1800f) * dt
+                        if (y <= target) {
+                            y = target
+                            startLand()
+                        }
+                    } else {
+                        vy = -dp(2600f)
+                        y += vy * dt
+                        if (y <= topInset - winH * 0.05f) startHang()
+                    }
                 }
             }
         }
@@ -497,7 +536,10 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 view.effectAge = age
             }
         }
-        if (view.bubbleText != null && clock > bubbleUntil) view.bubbleText = null
+        val cx = (x + winW / 2f).roundToInt()
+        val head = (y + offY + winH * 0.16f).roundToInt()
+        bubble.follow(cx, head, (y + winH * PetView.FEET).roundToInt(), screenW, topInset)
+        chatInput?.setAnchor(cx, head)
 
         val bmp = sprites.frame(frameAnim, frameIndex)
         if (bmp != null) view.frame = bmp
@@ -523,8 +565,8 @@ class PetController(private val context: Context, private val wm: WindowManager)
     }
 
     private fun say(text: String, seconds: Float = 3.2f) {
-        view.bubbleText = text
-        bubbleUntil = clock + seconds
+        if (bubble.speaking) return
+        bubble.showLine(text, seconds)
         talkUntil = clock + minOf(text.length * 0.12f, 1.8f)
     }
 
@@ -533,20 +575,75 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private val busy get() = state == State.DRAG || state == State.FALL || state == State.CLIMB || state == State.HANG
 
     /** Shows the first sentence of a chat reply in the bubble; the full text stays in the chat panel. */
+    /** Says a whole chat reply in the floating bubble, voiced sentence by sentence when TTS is on. */
     fun speak(text: String) {
-        val clean = text.replace(Regex("\\s+"), " ").trim()
-        val end = Regex("[。！？!?~～]|…+").findAll(clean).firstOrNull { it.range.last >= 6 }
-        val cut = end?.let { clean.substring(0, it.range.last + 1) } ?: clean
-        val excerpt = if (cut.length > 26) cut.take(24) + "…" else cut
+        val parts = Voice.sentences(text.trim()).ifEmpty { listOf(text.trim()) }
         if (!busy) idle()
         effect("sparkle", 1.2f)
-        say(excerpt, (excerpt.length * 0.25f).coerceIn(3f, 8f))
+        bubble.begin()
+        if (Voice.enabled(context)) {
+            var appended = 0
+            Voice.speak(context, parts, onSentence = { i, seconds ->
+                while (appended < i) { bubble.append(parts[appended], 0.3f); appended++ }
+                bubble.append(parts[i], seconds)
+                appended = i + 1
+                talkUntil = clock + seconds
+            }, onDone = { _ ->
+                while (appended < parts.size) { bubble.append(parts[appended], parts[appended].length / 14f); appended++ }
+                bubble.finish()
+            })
+        } else {
+            var total = 0f
+            parts.forEach { p -> val sec = p.length / 14f; bubble.append(p, sec); total += sec }
+            talkUntil = clock + total
+            bubble.finish()
+        }
     }
 
     fun thinking() {
         if (busy) return
         act("think", 0f, false, 30f)
         effect("dots", 3f)
+    }
+
+    private fun petRect(): Rect = Rect(x.roundToInt(), y.roundToInt(), (x + winW).roundToInt(), (y + winH).roundToInt())
+
+    private fun openChatInput() {
+        if (chatInput != null) return
+        if (state == State.SLEEP || state == State.SIT || state == State.ACT || state == State.WALK) idle()
+        effect("notice", 0.8f)
+        chatInput = ChatInput(
+            context, wm,
+            petRect = { petRect() },
+            onSend = { sendChat(it) },
+            onExpand = { onOpenChat?.invoke() },
+            onPetTap = { poke() },
+            onKeyboard = { top -> onChatKeyboard(top) },
+            onClosed = { chatInput = null },
+        ).also { it.open(screenW) }
+    }
+
+    private fun sendChat(text: String) {
+        if (!ChatConfig.isReady(context)) {
+            say("先在设置里填好 API 吧，我才能回你。", 4f)
+            onOpenSettings?.invoke()
+            return
+        }
+        val card = CardStore.active(context)
+        val history = ChatStore.load(context, card.id)
+        history.add(Msg("user", text))
+        ChatStore.save(context, card.id, history)
+        thinking()
+        ChatClient.send(context, card, history) { result ->
+            result.onSuccess { reply ->
+                val h = ChatStore.load(context, card.id)
+                h.add(Msg("assistant", reply))
+                ChatStore.save(context, card.id, h)
+                speak(reply)
+            }.onFailure { e ->
+                speak("……好像没连上。" + (e.message?.let { "（${it.take(60)}）" } ?: ""))
+            }
+        }
     }
 
     // ---------------------------------------------------------------- touch
@@ -619,23 +716,29 @@ class PetController(private val context: Context, private val wm: WindowManager)
     }
 
     private fun onTap() {
-        val doubleTap = clock - lastTapAt < 0.3f
-        lastTapAt = clock
+        when (state) {
+            State.CLIMB, State.HANG -> {
+                effect("exclaim", 1.2f)
+                startFall()
+            }
+            State.SLEEP -> {
+                enter(State.POKE, "poke", 0f, false, 1.4f)
+                effect("notice", 1.2f)
+                say(Lines.pick(Lines.wake))
+            }
+            State.DRAG, State.FALL, State.FLY -> Unit
+            else -> openChatInput()
+        }
+    }
+
+    /** A tap on her while the input bubble is open: a poke; many pokes make her cross. */
+    private fun poke() {
         if (clock - tapWindowStart > 2f) {
             tapWindowStart = clock
             tapCount = 0
         }
         tapCount++
         when {
-            state == State.CLIMB || state == State.HANG -> {
-                effect("exclaim", 1.2f)
-                startFall()
-            }
-            state == State.SLEEP -> {
-                enter(State.POKE, "poke", 0f, false, 1.4f)
-                effect("notice", 1.2f)
-                say(Lines.pick(Lines.wake))
-            }
             tapCount >= 7 -> {
                 act("sad", 0f, false, 3f)
                 effect("sweat", 2f)
@@ -646,12 +749,6 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 act("angry", 0f, false, 2.4f)
                 effect("anger", 2f)
                 say(Lines.pick(Lines.angry))
-            }
-            doubleTap -> {
-                act("happy", 4f, true, 1.8f)
-                effect(if (Random.nextBoolean()) "heart" else "music", 1.6f)
-                say(Lines.pick(Lines.chatOpen), 2f)
-                onOpenChat?.invoke()
             }
             else -> {
                 enter(State.POKE, "poke", 0f, false, 1.0f)

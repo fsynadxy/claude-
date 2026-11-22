@@ -44,3 +44,8 @@ python3 tools/compose.py   # 统一画布，输出白底、透明、贴纸三个
 - 主界面“聊天设置”：支持 Anthropic 格式和 OpenAI 兼容格式。默认是 OpenCode 的 Anthropic 接口，模型 `claude-sonnet-5-5`；填入自己的 Key 即可使用。Key 只保存在手机的应用数据里。
 - 内置角色卡“Claude大小姐”：内在就是 Claude，说话尽量贴近 Claude 本人的风格。
 - 自定义角色卡：可以新建、编辑（内置卡会先复制一份）、删除；也能导入 SillyTavern / TavernAI 角色卡（.json，或内嵌数据的 .png，支持 v1 / v2 / v3）。每张卡的聊天记录分开保存。
+
+## 说话与语音
+- 单击 Clau娘：头顶弹出对话气泡样式的输入框；键盘弹出时她会跳到键盘上沿，输入框保持可见。回复会完整显示在她头顶的气泡里，逐字出现。
+- 语音朗读：离线开源 TTS，[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) 1.13.8（Apache-2.0）+ piper 中文女声 `zh_CN-huayan-medium`。模型训练数据的授权在模型卡中标注为 Unknown，仅建议个人使用。
+- 引擎和模型在编译时从 sherpa-onnx 的 GitHub Releases 下载，并校验 SHA-256，不提交进仓库；espeak-ng 数据只保留中文和英文词典。安装包只含 arm64-v8a。
