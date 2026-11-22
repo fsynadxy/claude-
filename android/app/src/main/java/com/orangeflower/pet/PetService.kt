@@ -42,8 +42,12 @@ class PetService : Service() {
         if (controller == null) {
             val ctx = overlayContext()
             val wm = ctx.getSystemService(WindowManager::class.java)
-            controller = PetController(ctx, wm).also { it.start(Prefs.size(this)) }
+            controller = PetController(ctx, wm).also {
+                it.onOpenChat = { openChat() }
+                it.start(Prefs.size(this))
+            }
             running = true
+            instance = this
         }
         return START_STICKY
     }
@@ -61,10 +65,15 @@ class PetService : Service() {
         controller?.onScreenChanged()
     }
 
+    private fun openChat() {
+        startActivity(Intent(this, ChatActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
+
     override fun onDestroy() {
         controller?.stop()
         controller = null
         running = false
+        instance = null
         super.onDestroy()
     }
 
@@ -84,12 +93,16 @@ class PetService : Service() {
         val stop = PendingIntent.getService(
             this, 1, Intent(this, PetService::class.java).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE
         )
+        val chat = PendingIntent.getActivity(
+            this, 2, Intent(this, ChatActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), PendingIntent.FLAG_IMMUTABLE
+        )
         val notification = Notification.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_flower)
             .setContentTitle("Clau娘在屏幕上陪着你")
-            .setContentText("点“收起”让她回去休息")
+            .setContentText("双击她可以聊天，点“收起”让她回去休息")
             .setContentIntent(open)
             .setOngoing(true)
+            .addAction(Notification.Action.Builder(null, "聊天", chat).build())
             .addAction(Notification.Action.Builder(null, "收起", stop).build())
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -108,6 +121,18 @@ class PetService : Service() {
         @Volatile
         var running = false
             private set
+
+        private var instance: PetService? = null
+
+        /** Shows a chat reply above the pet (main thread). */
+        fun speak(text: String) {
+            instance?.controller?.speak(text)
+        }
+
+        /** Puts the pet into a thinking pose while a reply is on its way (main thread). */
+        fun thinking() {
+            instance?.controller?.thinking()
+        }
     }
 }
 

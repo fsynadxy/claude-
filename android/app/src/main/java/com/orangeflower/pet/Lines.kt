@@ -33,6 +33,7 @@ object Lines {
         "累了就伸个懒腰吧。",
         "……嗯，这一页很好看。",
     )
+    val chatOpen = listOf("嗯，想聊什么？", "我在听。", "说吧。")
     val rest = listOf("坐太久啦，起来走走吧。", "眼睛也要休息一下哦。", "该喝口水了。")
 
     fun pick(list: List<String>): String = list[Random.nextInt(list.size)]

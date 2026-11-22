@@ -28,6 +28,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private enum class State { IDLE, WALK, ACT, POKE, PAT, DRAG, FALL, LAND, SIT, SLEEP, CLIMB, HANG }
 
     private val sprites = Sprites(context)
+    var onOpenChat: (() -> Unit)? = null
     val view = PetView(context)
     private val handler = Handler(Looper.getMainLooper())
     private val density = context.resources.displayMetrics.density
@@ -436,6 +437,27 @@ class PetController(private val context: Context, private val wm: WindowManager)
         talkUntil = clock + minOf(text.length * 0.12f, 1.8f)
     }
 
+    // ---------------------------------------------------------------- chat
+
+    private val busy get() = state == State.DRAG || state == State.FALL || state == State.CLIMB || state == State.HANG
+
+    /** Shows the first sentence of a chat reply in the bubble; the full text stays in the chat panel. */
+    fun speak(text: String) {
+        val clean = text.replace(Regex("\\s+"), " ").trim()
+        val end = Regex("[。！？!?~～]|…+").findAll(clean).firstOrNull { it.range.last >= 6 }
+        val cut = end?.let { clean.substring(0, it.range.last + 1) } ?: clean
+        val excerpt = if (cut.length > 26) cut.take(24) + "…" else cut
+        if (!busy) idle()
+        effect("sparkle", 1.2f)
+        say(excerpt, (excerpt.length * 0.25f).coerceIn(3f, 8f))
+    }
+
+    fun thinking() {
+        if (busy) return
+        act("think", 0f, false, 30f)
+        effect("dots", 3f)
+    }
+
     // ---------------------------------------------------------------- touch
 
     private fun onTouch(e: MotionEvent) {
@@ -537,7 +559,8 @@ class PetController(private val context: Context, private val wm: WindowManager)
             doubleTap -> {
                 act("happy", 4f, true, 1.8f)
                 effect(if (Random.nextBoolean()) "heart" else "music", 1.6f)
-                say(Lines.pick(Lines.happy))
+                say(Lines.pick(Lines.chatOpen), 2f)
+                onOpenChat?.invoke()
             }
             else -> {
                 enter(State.POKE, "poke", 0f, false, 1.0f)

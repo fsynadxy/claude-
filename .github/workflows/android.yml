@@ -39,9 +39,19 @@ jobs:
           path: android/dist/*.apk
           if-no-files-found: error
 
-      # Pushing a tag such as v1.0 also publishes the APK as a GitHub Release (direct download on a phone).
+      # Every successful build is published as a GitHub Release, so the APK can be downloaded
+      # straight onto a phone. The action creates the tag (v1.0.<run number>) itself.
       - name: Publish release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || format('v1.0.{0}', github.run_number) }}
+          target_commitish: ${{ github.sha }}
+          name: Clau娘 1.0.${{ github.run_number }}
+          make_latest: true
+          body: |
+            在手机上点下面的 APK 下载安装（需要允许安装未知来源应用）。
+            首次打开点“请她出来”，并允许“显示在其他应用上层”。
+            新版本可以直接覆盖安装，不需要先卸载。
+
+            提交：${{ github.event.head_commit.message }}
           files: android/dist/*.apk

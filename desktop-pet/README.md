@@ -38,3 +38,9 @@ python3 tools/compose.py   # 统一画布，输出白底、透明、贴纸三个
 
 ## 安卓应用（Clau娘）
 项目在仓库根目录的 `android/`，推送后 GitHub Actions（`.github/workflows/android.yml`）自动编译 APK，在 Actions 页面的 Artifacts 里下载。推送 `v` 开头的标签（如 `v1.0`）时，还会把 APK 发布到 Releases，方便在手机上直接下载。
+
+## 聊天（角色卡）
+- 双击 Clau娘 或在通知栏点“聊天”，会弹出聊天面板；完整回复显示在面板里，她头顶的气泡只说第一句。
+- 主界面“聊天设置”：支持 Anthropic 格式和 OpenAI 兼容格式。默认是 OpenCode 的 Anthropic 接口，模型 `claude-sonnet-5-5`；填入自己的 Key 即可使用。Key 只保存在手机的应用数据里。
+- 内置角色卡“Claude大小姐”：内在就是 Claude，说话尽量贴近 Claude 本人的风格。
+- 自定义角色卡：可以新建、编辑（内置卡会先复制一份）、删除；也能导入 SillyTavern / TavernAI 角色卡（.json，或内嵌数据的 .png，支持 v1 / v2 / v3）。每张卡的聊天记录分开保存。
