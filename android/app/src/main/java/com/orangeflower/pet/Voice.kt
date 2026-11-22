@@ -122,6 +122,7 @@ object Voice {
         val gen = generation.incrementAndGet()
         val queue = LinkedBlockingQueue<Chunk>()
         synthThread.execute {
+          try {
             val engine = ensureEngine(app)
             if (engine == null) {
                 queue.put(Chunk(gen, -1, "", null, 0))
@@ -138,6 +139,10 @@ object Voice {
                 queue.put(Chunk(gen, i, p, audio?.samples, audio?.sampleRate ?: engine.sampleRate()))
             }
             queue.put(Chunk(gen, parts.size, "", null, 0))
+          } catch (e: Throwable) {
+            error = "合成失败：" + (e.message ?: e.javaClass.simpleName)
+            queue.put(Chunk(gen, -1, "", null, 0))
+          }
         }
         playThread.execute {
             // drop whatever an interrupted sentence left in the buffer
@@ -146,10 +151,11 @@ object Voice {
                 framesWritten = 0
             }
             var ok = true
+            try {
             while (true) {
                 val chunk = queue.take()
                 if (chunk.gen != generation.get()) { ok = false; break }
-                if (chunk.index < 0) { ok = false; break }
+                if (chunk.index < 0) { ok = false; break }   // engine unavailable: error is set
                 if (chunk.index >= parts.size) break
                 val samples = chunk.samples
                 val seconds = if (samples != null) samples.size / chunk.rate.toFloat() else 0.6f
@@ -159,6 +165,11 @@ object Voice {
                 } else {
                     play(samples, chunk.rate, gen)
                 }
+            }
+            } catch (e: Throwable) {
+                ok = false
+                error = "播放失败：" + (e.message ?: e.javaClass.simpleName)
+                try { stopTrack() } catch (_: Throwable) {}
             }
             main.post { if (generation.get() == gen) onDone(ok) }
         }

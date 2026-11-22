@@ -147,11 +147,15 @@ class SpeechBubble(context: Context, private val wm: WindowManager) {
 
     init {
         root.setOnClickListener {
-            if (shown < target.length || speaking) {
+            if (speaking) {
+                // skip the voice; the reply's remaining text is filled in by the done callback
+                onSkip?.invoke()
+            }
+            if (shown < target.length) {
                 shown = target.length.toFloat()
                 setVisibleText()
-                if (speaking) onSkip?.invoke()
-            } else {
+                if (!speaking) scheduleHide()
+            } else if (!speaking) {
                 hide()
             }
         }

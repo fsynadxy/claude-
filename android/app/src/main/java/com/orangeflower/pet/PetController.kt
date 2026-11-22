@@ -118,9 +118,10 @@ class PetController(private val context: Context, private val wm: WindowManager)
     private val keyboard = KeyboardWatcher(context, wm) { top -> if (chatInput == null) onKeyboard(top) }
 
     // chat: input bubble, speech bubble, voice
-    private val bubble = SpeechBubble(context, wm).also { b -> b.onSkip = { Voice.stop() } }
+    private val bubble = SpeechBubble(context, wm).also { b -> b.onSkip = { VoiceClient.stop() } }
     private var chatInput: ChatInput? = null
     private var flyHop = false
+    private var voiceErrorShown = false
     var onOpenSettings: (() -> Unit)? = null
 
     private fun dp(v: Float) = v * density
@@ -147,7 +148,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
         Choreographer.getInstance().postFrameCallback(tick)
         keyboard.start()
         bubble.attach()
-        if (Voice.enabled(context)) Voice.prepare(context)
+        if (Voice.enabled(context)) VoiceClient.prepare(context)
     }
 
     fun stop() {
@@ -157,7 +158,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
         keyboard.stop()
         chatInput?.close()
         bubble.detach()
-        Voice.stop()
+        VoiceClient.stop()
         try {
             wm.removeView(view)
         } catch (_: Exception) {
@@ -583,14 +584,18 @@ class PetController(private val context: Context, private val wm: WindowManager)
         bubble.begin()
         if (Voice.enabled(context)) {
             var appended = 0
-            Voice.speak(context, parts, onSentence = { i, seconds ->
+            VoiceClient.speak(context, parts, onSentence = { i, seconds ->
                 while (appended < i) { bubble.append(parts[appended], 0.3f); appended++ }
                 bubble.append(parts[i], seconds)
                 appended = i + 1
                 talkUntil = clock + seconds
-            }, onDone = { _ ->
+            }, onDone = { ok ->
                 while (appended < parts.size) { bubble.append(parts[appended], parts[appended].length / 14f); appended++ }
                 bubble.finish()
+                if (!ok && VoiceClient.lastError != null && !voiceErrorShown) {
+                    voiceErrorShown = true
+                    effect("sweat", 1.5f)
+                }
             })
         } else {
             var total = 0f

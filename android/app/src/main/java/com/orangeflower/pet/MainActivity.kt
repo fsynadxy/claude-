@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var sizeLabel: TextView
     private lateinit var cardLabel: TextView
+    private lateinit var diagText: TextView
     private val handler = Handler(Looper.getMainLooper())
 
     private val ink = Color.parseColor("#3B2620")
@@ -246,7 +247,7 @@ class MainActivity : Activity() {
             isChecked = Voice.enabled(this@MainActivity)
             setOnCheckedChangeListener { _, on ->
                 Voice.setEnabled(this@MainActivity, on)
-                if (on) Voice.prepare(this@MainActivity) else Voice.stop()
+                if (on) VoiceClient.prepare(this@MainActivity) else VoiceClient.stop()
             }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
         root.addView(TextView(this).apply {
@@ -254,6 +255,17 @@ class MainActivity : Activity() {
             textSize = 12f
             setTextColor(muted)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
+        val voiceStatus = TextView(this).apply { textSize = 13f; setTextColor(muted) }
+        root.addView(outlineButton("试听语音") {
+            voiceStatus.text = "正在准备语音……（第一次需要几秒）"
+            val started = System.currentTimeMillis()
+            VoiceClient.speak(this, listOf("你好，我是 Clau娘。", "这样说话，听得清楚吗？"), onSentence = { i, sec ->
+                if (i == 0) voiceStatus.text = "正在朗读（准备用了 ${(System.currentTimeMillis() - started) / 100 / 10.0} 秒）"
+            }, onDone = { ok ->
+                voiceStatus.text = if (ok) "语音正常" else "语音没能播放：${VoiceClient.lastError ?: "未知原因"}\n诊断信息里可能有更多细节。"
+            })
+        }, LinearLayout.LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(8) })
+        root.addView(voiceStatus, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
 
         // ---- character cards
         root.addView(sectionTitle("角色卡"), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
@@ -283,6 +295,27 @@ class MainActivity : Activity() {
             setLineSpacing(dp(4).toFloat(), 1f)
             setTextColor(muted)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
+
+        // ---- diagnostics
+        root.addView(sectionTitle("诊断信息"), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
+        diagText = TextView(this).apply {
+            textSize = 11f
+            typeface = Typeface.MONOSPACE
+            setTextColor(muted)
+            setTextIsSelectable(true)
+        }
+        root.addView(diagText, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        val diagButtons = LinearLayout(this)
+        diagButtons.addView(outlineButton("复制诊断信息") {
+            val cm = getSystemService(android.content.ClipboardManager::class.java)
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("Clau娘诊断", Diagnostics.report(this)))
+            Toast.makeText(this, "已复制，可以直接粘贴发给我", Toast.LENGTH_SHORT).show()
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { rightMargin = dp(8) })
+        diagButtons.addView(outlineButton("清除记录") {
+            Diagnostics.clear(this)
+            refresh()
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        root.addView(diagButtons, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
 
         setContentView(ScrollView(this).apply { setBackgroundColor(paper); fitsSystemWindows = true; addView(root) })
     }
@@ -333,6 +366,8 @@ class MainActivity : Activity() {
     }
 
     private fun refresh() {
+        val report = Diagnostics.report(this)
+        diagText.text = if (report.lines().size > 1) report.takeLast(3000) else report + "\n暂无异常记录"
         cardLabel.text = "当前角色：${CardStore.active(this).name}"
         val canOverlay = Settings.canDrawOverlays(this)
         toggle.text = if (PetService.running) "让她回去休息" else "请她出来"
