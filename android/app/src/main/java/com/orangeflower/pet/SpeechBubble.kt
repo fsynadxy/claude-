@@ -50,7 +50,9 @@ class BubbleTail(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         val h = height.toFloat()
         val half = 9 * d
-        val x = tipX.coerceIn(half + 12 * d, width - half - 12 * d)
+        val lo = half + 12 * d
+        val hi = width - half - 12 * d
+        val x = if (hi >= lo) tipX.coerceIn(lo, hi) else width / 2f   // very narrow bubble: centre the tail
         path.reset()
         if (pointsUp) {
             path.moveTo(x - half, h + 1); path.lineTo(x, 1f); path.lineTo(x + half, h + 1)
@@ -90,6 +92,7 @@ class SpeechBubble(context: Context, private val wm: WindowManager) {
     }
     private val card = LinearLayout(context).apply {
         background = BubbleStyle.card(d)
+        minimumWidth = (72 * d).roundToInt()
         setPadding((14 * d).roundToInt(), (10 * d).roundToInt(), (14 * d).roundToInt(), (10 * d).roundToInt())
         addView(scroll)
     }

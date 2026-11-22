@@ -214,8 +214,8 @@ class PetController(private val context: Context, private val wm: WindowManager)
     }
 
     private fun clampToScreen() {
-        x = x.coerceIn(minX, maxX)
-        y = y.coerceIn(topInset - winH * 0.3f, groundTop)
+        x = x.safeCoerce(minX, maxX)
+        y = y.safeCoerce(topInset - winH * 0.3f, groundTop)
     }
 
     private fun pushLayout(force: Boolean = false) {
@@ -399,7 +399,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 x += (if (facingRight) 1f else -1f) * dp(34f) * dt
                 if (x <= minX || x >= maxX) {
                     val atLeft = x <= minX
-                    x = x.coerceIn(minX, maxX)
+                    x = x.safeCoerce(minX, maxX)
                     if (Random.nextFloat() < 0.3f) startClimb(atLeft) else idle()
                 } else if (t > dur) {
                     idle()
@@ -451,7 +451,7 @@ class PetController(private val context: Context, private val wm: WindowManager)
                 x += vx * dt
                 y += vy * dt
                 if (x < minX || x > maxX) {
-                    x = x.coerceIn(minX, maxX)
+                    x = x.safeCoerce(minX, maxX)
                     vx = -vx * 0.4f
                 }
                 view.rotationDeg *= (1f - dt * 6f).coerceAtLeast(0f)
@@ -763,3 +763,6 @@ class PetController(private val context: Context, private val wm: WindowManager)
         }
     }
 }
+
+/** Like coerceIn, but never throws when the range is empty (tiny screens, landscape with a tall keyboard). */
+private fun Float.safeCoerce(lo: Float, hi: Float): Float = if (hi < lo) hi else coerceIn(lo, hi)
