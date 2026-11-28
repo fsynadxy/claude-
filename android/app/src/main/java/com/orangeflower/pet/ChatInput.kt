@@ -61,6 +61,22 @@ class ChatInput(
         setOnEditorActionListener { _, id, _ -> if (id == EditorInfo.IME_ACTION_SEND) { send(); true } else false }
     }
 
+    /** Starts a new conversation; the earlier ones stay in the chat panel's list. */
+    private val newTopic = TextView(context).apply {
+        text = "＋"
+        textSize = 20f
+        setTextColor(BubbleStyle.hint)
+        gravity = Gravity.CENTER
+        contentDescription = "开新话题"
+        setOnClickListener {
+            val card = CardStore.active(context)
+            val before = ChatStore.currentId(context, card.id)
+            val now = ChatStore.startNew(context, card.id)
+            edit.hint = if (now == before) "已经是新话题啦，说点什么…" else "新话题：想聊点什么…"
+            setTextColor(BubbleStyle.text)
+        }
+    }
+
     private val expand = TextView(context).apply {
         text = "⤢"
         textSize = 20f
@@ -99,7 +115,8 @@ class ChatInput(
         background = BubbleStyle.card(d)
         setPadding(dp(10), dp(10), dp(10), dp(10))
         addView(edit, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
-        addView(expand, LinearLayout.LayoutParams(dp(36), dp(36)).apply { leftMargin = dp(4) })
+        addView(newTopic, LinearLayout.LayoutParams(dp(34), dp(36)).apply { leftMargin = dp(2) })
+        addView(expand, LinearLayout.LayoutParams(dp(34), dp(36)))
         addView(sendButton, LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT).apply { leftMargin = dp(4) })
     }
 

@@ -1,6 +1,7 @@
 package com.orangeflower.pet
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
@@ -8,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Build
 import android.os.Bundle
 import android.text.InputType
+import android.text.format.DateUtils
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
@@ -19,8 +21,10 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.PopupMenu
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import kotlin.math.roundToInt
 
 /** Bottom chat panel. Translucent, so the pet stays visible above it. */
@@ -32,13 +36,15 @@ class ChatActivity : Activity() {
     private lateinit var input: EditText
     private lateinit var sendButton: Button
     private lateinit var title: TextView
-    private lateinit var clearButton: Button
+    private lateinit var subtitle: TextView
 
     private lateinit var card: Card
+    private var sessionId = ""
     private var history = mutableListOf<Msg>()
-    private var waiting = false
+    /** Conversation a reply is on its way for (only one at a time). */
+    private var waitingSid: String? = null
+    private val waiting get() = waitingSid != null
     private var pending: TextView? = null
-    private var clearArmed = false
 
     private val ink = Color.parseColor("#3B2620")
     private val muted = Color.parseColor("#7A665B")
@@ -70,10 +76,17 @@ class ChatActivity : Activity() {
         // header
         val header = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         title = TextView(this).apply { textSize = 17f; setTypeface(typeface, Typeface.BOLD); setTextColor(ink) }
-        header.addView(title, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        subtitle = TextView(this).apply { textSize = 12f; setTextColor(muted); setSingleLine(true); ellipsize = android.text.TextUtils.TruncateAt.END }
+        val titles = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(title)
+            addView(subtitle)
+            setOnClickListener { showSessions() }
+        }
+        header.addView(titles, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+        header.addView(smallButton("新话题") { onNewTopic() })
+        header.addView(smallButton("对话") { showSessions() })
         header.addView(smallButton("换角色") { startActivity(Intent(this, CardsActivity::class.java)) })
-        clearButton = smallButton("清空") { onClear() }
-        header.addView(clearButton)
         panel.addView(header, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT))
 
         // messages
@@ -135,8 +148,13 @@ class ChatActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        reload()
+    }
+
+    private fun reload() {
         card = CardStore.active(this)
-        history = ChatStore.load(this, card.id)
+        sessionId = ChatStore.currentId(this, card.id)
+        history = ChatStore.load(this, card.id, sessionId)
         render()
     }
 
@@ -154,6 +172,7 @@ class ChatActivity : Activity() {
 
     private fun render() {
         title.text = card.name
+        subtitle.text = ChatStore.current(this, card.id).shownTitle() + "  ▾"
         list.removeAllViews()
         pending = null
         if (!ChatConfig.isReady(this)) {
@@ -176,7 +195,7 @@ class ChatActivity : Activity() {
                 else -> addBubble(Emotion.strip(it.content), mine = false).also { tv -> tv.text = ActionText.dim(tv.text, muted) }
             }
         }
-        if (waiting) pending = addBubble("……", mine = false, note = true)
+        if (waitingSid == sessionId) pending = addBubble("……", mine = false, note = true)
         scrollToEnd()
     }
 
@@ -213,31 +232,26 @@ class ChatActivity : Activity() {
         }
         input.setText("")
         val cardNow = card
-        history.add(Msg("user", text))
-        ChatStore.save(this, cardNow.id, history)
         addBubble(text, mine = true)
-        waiting = true
         sendButton.isEnabled = false
         pending = addBubble("……", mine = false, note = true)
         scrollToEnd()
         PetService.thinking()
 
         val app = applicationContext
-        ChatClient.send(this, cardNow, history) { result ->
-            waiting = false
+        val sid = ChatClient.ask(this, cardNow, text) { result ->
+            val sameView = !isDestroyed && card.id == cardNow.id && sessionId == waitingSid
+            waitingSid = null
             result.onSuccess { reply ->
-                val h = ChatStore.load(app, cardNow.id)
-                h.add(Msg("assistant", reply))
-                ChatStore.save(app, cardNow.id, h)
                 PetService.speak(reply)
-                if (!isDestroyed && card.id == cardNow.id) {
-                    history = h
+                if (sameView) {
+                    history = ChatStore.load(app, cardNow.id, sessionId)
                     pending?.let { it.text = ActionText.dim(Emotion.strip(reply), muted); it.setTextColor(ink) }
                     pending = null
                 }
             }.onFailure { e ->
                 PetService.speak("……好像没连上。")
-                if (!isDestroyed) {
+                if (sameView) {
                     pending?.text = "没连上：${e.message ?: e.javaClass.simpleName}\n可以检查一下聊天设置里的地址、模型和 Key。"
                     pending = null
                 }
@@ -247,19 +261,118 @@ class ChatActivity : Activity() {
                 scrollToEnd()
             }
         }
+        waitingSid = sid
+        history = ChatStore.load(this, cardNow.id, sid)
+        subtitle.text = ChatStore.current(this, cardNow.id).shownTitle() + "  ▾"
     }
 
-    private fun onClear() {
-        if (!clearArmed) {
-            clearArmed = true
-            clearButton.text = "确认清空？"
-            clearButton.postDelayed({ clearArmed = false; clearButton.text = "清空" }, 3000)
-            return
+    /** Starts a fresh conversation; the old ones stay in the list. */
+    private fun onNewTopic() {
+        val before = sessionId
+        ChatStore.startNew(this, card.id)
+        reload()
+        Toast.makeText(this, if (before == sessionId) "已经是新话题啦" else "开始新话题，之前的对话还在“对话”里", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showSessions() {
+        val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(12), dp(4), dp(12), dp(4)) }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("${card.name} 的对话")
+            .setView(ScrollView(this).apply { addView(box) })
+            .setPositiveButton("开新话题") { _, _ -> onNewTopic() }
+            .setNegativeButton("关闭", null)
+            .create()
+
+        fun fill() {
+            box.removeAllViews()
+            val now = System.currentTimeMillis()
+            val cur = ChatStore.currentId(this, card.id)
+            ChatStore.sessions(this, card.id).forEach { session ->
+                val isCur = session.id == cur
+                val row = LinearLayout(this).apply {
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(12), dp(10), dp(4), dp(10))
+                    background = GradientDrawable().apply {
+                        cornerRadius = dp(12).toFloat()
+                        setColor(if (isCur) myBubble else Color.TRANSPARENT)
+                    }
+                }
+                val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+                col.addView(TextView(this).apply {
+                    text = session.shownTitle()
+                    textSize = 15f
+                    setTextColor(ink)
+                    setSingleLine(true)
+                    ellipsize = android.text.TextUtils.TruncateAt.END
+                    if (isCur) setTypeface(typeface, Typeface.BOLD)
+                })
+                val n = ChatStore.userCount(this, card.id, session.id)
+                val time = DateUtils.getRelativeTimeSpanString(session.updated, now, DateUtils.MINUTE_IN_MILLIS)
+                col.addView(TextView(this).apply {
+                    text = listOfNotNull(time, if (n > 0) "$n 句" else "还没开始", if (isCur) "正在聊" else null).joinToString(" · ")
+                    textSize = 12f
+                    setTextColor(muted)
+                })
+                row.addView(col, LinearLayout.LayoutParams(0, WRAP_CONTENT, 1f))
+                val more = TextView(this).apply {
+                    text = "⋯"
+                    textSize = 20f
+                    setTextColor(muted)
+                    gravity = Gravity.CENTER
+                    contentDescription = "改名或删除"
+                }
+                more.setOnClickListener {
+                    PopupMenu(this, more).apply {
+                        menu.add(0, 1, 0, "改名")
+                        menu.add(0, 2, 1, "删除")
+                        setOnMenuItemClickListener { item ->
+                            if (item.itemId == 1) renameSession(session) { fill(); render() }
+                            else deleteSession(session) { fill(); reload() }
+                            true
+                        }
+                    }.show()
+                }
+                row.addView(more, LinearLayout.LayoutParams(dp(44), dp(44)))
+                row.setOnClickListener {
+                    ChatStore.select(this, card.id, session.id)
+                    dialog.dismiss()
+                    reload()
+                }
+                box.addView(row, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+            }
+            box.addView(TextView(this).apply {
+                text = "点一下切换到那段对话；⋯ 可以改名或删除。桌面上的她和头顶输入框都接着“正在聊”的那段说。"
+                textSize = 12f
+                setTextColor(muted)
+                setPadding(dp(4), dp(10), dp(4), 0)
+            })
         }
-        clearArmed = false
-        clearButton.text = "清空"
-        ChatStore.clear(this, card.id)
-        history.clear()
-        render()
+        fill()
+        dialog.show()
+    }
+
+    private fun renameSession(session: Session, after: () -> Unit) {
+        val field = EditText(this).apply {
+            setText(if (session.named) session.title else "")
+            hint = session.title.ifBlank { "新对话" }
+            setSingleLine(true)
+            setSelection(text.length)
+        }
+        AlertDialog.Builder(this)
+            .setTitle("改个名字")
+            .setView(FrameLayout(this).apply { setPadding(dp(20), dp(8), dp(20), 0); addView(field) })
+            .setPositiveButton("好") { _, _ -> ChatStore.rename(this, card.id, session.id, field.text.toString()); after() }
+            .setNeutralButton("用自动标题") { _, _ -> ChatStore.rename(this, card.id, session.id, ""); after() }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun deleteSession(session: Session, after: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setTitle("删除「${session.shownTitle()}」？")
+            .setMessage("这段对话会被删除，不能恢复。其他对话不受影响。")
+            .setPositiveButton("删除") { _, _ -> ChatStore.delete(this, card.id, session.id); after() }
+            .setNegativeButton("取消", null)
+            .show()
     }
 }

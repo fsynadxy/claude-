@@ -7,7 +7,7 @@ plugins {
 }
 
 // Shown version; CI reads it for the APK name and the release tag.
-val appVersion = "1.2.0"
+val appVersion = "1.3.0"
 // CI run number becomes the version code, so each new APK installs over the previous one.
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 

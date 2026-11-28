@@ -54,8 +54,20 @@ class PetService : Service() {
             }
             running = true
             instance = this
+            announceUpdate()
         }
         return START_STICKY
+    }
+
+    /** Once per new version, she mentions it a little after coming out (if automatic checks are on). */
+    private fun announceUpdate() {
+        Updates.check(this, force = false) { r ->
+            val rel = r.getOrNull() ?: return@check
+            if (Updates.isIgnored(this, rel.version) || !Updates.shouldAnnounce(this, rel.version)) return@check
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                controller?.speak("【开心】Clau娘出新版本 ${rel.version} 啦，打开主界面就能更新。")
+            }, 6000)
+        }
     }
 
     /** Android 11+ wants overlay windows added through a window context tied to a display. */

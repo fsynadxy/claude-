@@ -40,6 +40,11 @@ class MainActivity : Activity() {
     private lateinit var sizeLabel: TextView
     private lateinit var cardLabel: TextView
     private lateinit var diagText: TextView
+    private lateinit var updateBox: LinearLayout
+    private lateinit var updateTitle: TextView
+    private lateinit var updateNotes: TextView
+    private lateinit var updateStatus: TextView
+    private var shownRelease: Updates.Release? = null
     private val handler = Handler(Looper.getMainLooper())
 
     private val ink = Color.parseColor("#3B2620")
@@ -91,6 +96,34 @@ class MainActivity : Activity() {
             setOnClickListener { onToggle() }
         }
         root.addView(toggle, LinearLayout.LayoutParams(dp(220), dp(48)).apply { topMargin = dp(20) })
+
+        // ---- new version banner (hidden until a newer release is known)
+        updateBox = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+            setPadding(dp(16), dp(14), dp(16), dp(12))
+            background = GradientDrawable().apply { cornerRadius = dp(16).toFloat(); setColor(Color.parseColor("#FBE2D1")) }
+        }
+        updateTitle = TextView(this).apply { textSize = 15f; setTypeface(typeface, Typeface.BOLD); setTextColor(ink) }
+        updateNotes = TextView(this).apply { textSize = 13f; setTextColor(muted); maxLines = 6; setLineSpacing(dp(2).toFloat(), 1f) }
+        updateBox.addView(updateTitle)
+        updateBox.addView(updateNotes, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        val updateButtons = LinearLayout(this)
+        updateButtons.addView(outlineButton("下载新版") { shownRelease?.let { Updates.openDownload(this, it) } },
+            LinearLayout.LayoutParams(0, dp(40), 1.2f).apply { rightMargin = dp(6) })
+        updateButtons.addView(outlineButton("更新说明") { shownRelease?.let { Updates.openPage(this, it) } },
+            LinearLayout.LayoutParams(0, dp(40), 1f).apply { rightMargin = dp(6) })
+        updateButtons.addView(outlineButton("先不了") {
+            shownRelease?.let { Updates.ignore(this, it.version) }
+            updateBox.visibility = View.GONE
+        }, LinearLayout.LayoutParams(0, dp(40), 1f))
+        updateBox.addView(updateButtons, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(10) })
+        updateBox.addView(TextView(this).apply {
+            text = "会在浏览器里下载安装包，下载后点开安装即可，直接覆盖旧版，聊天记录和设置都会保留。“先不了”之后这个版本不再提醒。"
+            textSize = 11f
+            setTextColor(muted)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(6) })
+        root.addView(updateBox, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(20) })
 
         sizeLabel = TextView(this).apply { textSize = 14f; setTextColor(ink) }
         root.addView(sizeLabel, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
@@ -322,6 +355,44 @@ class MainActivity : Activity() {
             setTextColor(muted)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
 
+        // ---- version and updates
+        root.addView(sectionTitle("版本"), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
+        root.addView(TextView(this).apply {
+            text = "当前版本：${Updates.installedVersion(this@MainActivity)}"
+            textSize = 14f
+            setTextColor(ink)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(Switch(this).apply {
+            text = "自动检查新版本"
+            textSize = 14f
+            setTextColor(ink)
+            isChecked = Updates.autoCheck(this@MainActivity)
+            setOnCheckedChangeListener { _, on -> Updates.setAutoCheck(this@MainActivity, on) }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+        root.addView(TextView(this).apply {
+            text = "每天最多看一次 GitHub 上的最新发布，不上传任何信息；有新版本时主界面会提示，她也会在桌面上提一句。"
+            textSize = 12f
+            setTextColor(muted)
+        }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
+        updateStatus = TextView(this).apply { textSize = 13f; setTextColor(muted) }
+        root.addView(outlineButton("检查更新") {
+            updateStatus.text = "正在检查……"
+            Updates.check(this, force = true) { r ->
+                if (isDestroyed) return@check
+                r.onSuccess { rel ->
+                    if (rel == null) {
+                        updateStatus.text = "已经是最新版本"
+                    } else {
+                        updateStatus.text = "发现新版本 ${rel.version}，在页面顶部"
+                        showUpdate(rel)
+                    }
+                }.onFailure { e ->
+                    updateStatus.text = "没检查成功：${e.message ?: e.javaClass.simpleName}\n国内访问 GitHub 有时不稳定，可以稍后再试，或直接打开发布页。"
+                }
+            }
+        }, LinearLayout.LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(8) })
+        root.addView(updateStatus, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
+
         // ---- diagnostics
         root.addView(sectionTitle("诊断信息"), LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(28) })
         diagText = TextView(this).apply {
@@ -349,6 +420,19 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         refresh()
+        Updates.check(this, force = false) { r ->
+            val rel = r.getOrNull() ?: return@check
+            if (!isDestroyed && !Updates.isIgnored(this, rel.version)) showUpdate(rel)
+        }
+    }
+
+    private fun showUpdate(rel: Updates.Release) {
+        shownRelease = rel
+        updateTitle.text = "发现新版本 ${rel.version}（当前 ${Updates.installedVersion(this)}）"
+        val notes = rel.notes.lines().map { it.trim() }.filter { it.isNotEmpty() && !it.startsWith("提交：") }
+        updateNotes.text = notes.joinToString("\n")
+        updateNotes.visibility = if (notes.isEmpty()) View.GONE else View.VISIBLE
+        updateBox.visibility = View.VISIBLE
     }
 
     private fun sectionTitle(t: String) = TextView(this).apply {

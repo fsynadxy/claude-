@@ -129,31 +129,158 @@ object ActionText {
 const val ACTION_PREFIX = "【互动】"
 
 
-/** Per-card chat history, newest last. */
-object ChatStore {
-    private const val KEEP = 40
-    private fun prefs(c: Context) = c.getSharedPreferences("history", Context.MODE_PRIVATE)
+/** One conversation's entry in the list (messages are stored separately). */
+data class Session(val id: String, val title: String, val updated: Long, val named: Boolean = false) {
+    fun shownTitle() = title.ifBlank { "新对话" }
+}
 
-    fun load(c: Context, cardId: String): MutableList<Msg> {
-        val raw = prefs(c).getString(cardId, null) ?: return mutableListOf()
-        return try {
-            val arr = JSONArray(raw)
-            MutableList(arr.length()) { i ->
-                val o = arr.getJSONObject(i)
-                Msg(o.getString("role"), o.getString("content"))
-            }
-        } catch (e: Exception) {
-            mutableListOf()
-        }
+/**
+ * Chat history, kept as several conversations per character card. One of them is "current":
+ * the pet, the bubble input and the chat panel all talk in it. Starting a new topic keeps the
+ * old conversations. The single history of 1.2 and earlier becomes the card's first conversation.
+ */
+object ChatStore {
+    private const val KEEP = 200
+    private fun prefs(c: Context) = c.getSharedPreferences("history", Context.MODE_PRIVATE)
+    private fun idxKey(cardId: String) = "idx:$cardId"
+    private fun msgKey(cardId: String, sid: String) = "msg:$cardId:$sid"
+
+    private class Index(var current: String, val list: MutableList<Session>)
+
+    /** Title made from the first thing the user typed (actions and screen looks don't count). */
+    fun autoTitle(list: List<Msg>): String {
+        val first = list.firstOrNull { it.role == "user" && !it.content.startsWith(ACTION_PREFIX) && !it.content.startsWith("【识图】") }
+            ?: return ""
+        val line = first.content.trim().lineSequence().first().trim()
+        return if (line.length > 16) line.take(16) + "…" else line
     }
 
-    fun save(c: Context, cardId: String, list: List<Msg>) {
+    fun newId(): String = java.lang.Long.toString(System.currentTimeMillis(), 36) + (100..999).random()
+
+    private fun readIndex(raw: String): Index? = try {
+        val o = JSONObject(raw)
+        val arr = o.getJSONArray("list")
+        val list = MutableList(arr.length()) { i ->
+            val s = arr.getJSONObject(i)
+            Session(s.getString("id"), s.optString("title"), s.optLong("updated"), s.optBoolean("named"))
+        }
+        if (list.isEmpty()) null else Index(o.optString("cur", list[0].id), list)
+    } catch (e: Exception) {
+        null
+    }
+
+    private fun writeIndex(c: Context, cardId: String, idx: Index) {
+        val arr = JSONArray()
+        idx.list.forEach {
+            arr.put(JSONObject().put("id", it.id).put("title", it.title).put("updated", it.updated).put("named", it.named))
+        }
+        prefs(c).edit().putString(idxKey(cardId), JSONObject().put("cur", idx.current).put("list", arr).toString()).apply()
+    }
+
+    private fun index(c: Context, cardId: String): Index {
+        val p = prefs(c)
+        p.getString(idxKey(cardId), null)?.let { readIndex(it) }?.let { idx ->
+            if (idx.list.none { it.id == idx.current }) idx.current = idx.list.maxBy { it.updated }.id
+            return idx
+        }
+        // first use: a fresh conversation, holding the old single history if there is one
+        val sid = newId()
+        val legacy = p.getString(cardId, null)
+        val msgs = legacy?.let { parse(it) } ?: emptyList()
+        val idx = Index(sid, mutableListOf(Session(sid, autoTitle(msgs), System.currentTimeMillis())))
+        val e = p.edit()
+        if (legacy != null) e.putString(msgKey(cardId, sid), legacy).remove(cardId)
+        e.apply()
+        writeIndex(c, cardId, idx)
+        return idx
+    }
+
+    private fun parse(raw: String): MutableList<Msg> = try {
+        val arr = JSONArray(raw)
+        MutableList(arr.length()) { i ->
+            val o = arr.getJSONObject(i)
+            Msg(o.getString("role"), o.getString("content"))
+        }
+    } catch (e: Exception) {
+        mutableListOf()
+    }
+
+    /** Conversations of [cardId], most recently used first. */
+    fun sessions(c: Context, cardId: String): List<Session> = index(c, cardId).list.sortedByDescending { it.updated }
+
+    fun currentId(c: Context, cardId: String): String = index(c, cardId).current
+
+    fun current(c: Context, cardId: String): Session = index(c, cardId).let { idx -> idx.list.first { it.id == idx.current } }
+
+    fun exists(c: Context, cardId: String, sid: String) = index(c, cardId).list.any { it.id == sid }
+
+    fun load(c: Context, cardId: String, sid: String = currentId(c, cardId)): MutableList<Msg> =
+        prefs(c).getString(msgKey(cardId, sid), null)?.let { parse(it) } ?: mutableListOf()
+
+    /** Saves a conversation; does nothing if it was deleted meanwhile (e.g. while a reply was on its way). */
+    fun save(c: Context, cardId: String, list: List<Msg>, sid: String = currentId(c, cardId)) {
+        val idx = index(c, cardId)
+        val i = idx.list.indexOfFirst { it.id == sid }
+        if (i < 0) return
         val arr = JSONArray()
         list.takeLast(KEEP).forEach { arr.put(JSONObject().put("role", it.role).put("content", it.content)) }
-        prefs(c).edit().putString(cardId, arr.toString()).apply()
+        prefs(c).edit().putString(msgKey(cardId, sid), arr.toString()).apply()
+        val s = idx.list[i]
+        idx.list[i] = s.copy(title = if (s.named) s.title else autoTitle(list), updated = System.currentTimeMillis())
+        writeIndex(c, cardId, idx)
     }
 
-    fun clear(c: Context, cardId: String) = prefs(c).edit().remove(cardId).apply()
+    /** Starts a new topic and makes it current. An empty current conversation is reused instead. */
+    fun startNew(c: Context, cardId: String): String {
+        val idx = index(c, cardId)
+        if (load(c, cardId, idx.current).isEmpty()) return idx.current
+        val sid = newId()
+        idx.list.add(Session(sid, "", System.currentTimeMillis()))
+        idx.current = sid
+        writeIndex(c, cardId, idx)
+        return sid
+    }
+
+    fun select(c: Context, cardId: String, sid: String) {
+        val idx = index(c, cardId)
+        if (idx.list.none { it.id == sid }) return
+        idx.current = sid
+        writeIndex(c, cardId, idx)
+    }
+
+    fun rename(c: Context, cardId: String, sid: String, title: String) {
+        val idx = index(c, cardId)
+        val i = idx.list.indexOfFirst { it.id == sid }
+        if (i < 0) return
+        val t = title.trim()
+        idx.list[i] = if (t.isEmpty()) idx.list[i].copy(title = autoTitle(load(c, cardId, sid)), named = false)
+        else idx.list[i].copy(title = t.take(30), named = true)
+        writeIndex(c, cardId, idx)
+    }
+
+    /** Deletes a conversation. If it was the current one, the most recent other becomes current (or a new empty one). */
+    fun delete(c: Context, cardId: String, sid: String) {
+        val idx = index(c, cardId)
+        if (!idx.list.removeAll { it.id == sid }) return
+        prefs(c).edit().remove(msgKey(cardId, sid)).apply()
+        if (idx.list.isEmpty()) {
+            val fresh = newId()
+            idx.list.add(Session(fresh, "", System.currentTimeMillis()))
+        }
+        if (idx.current == sid) idx.current = idx.list.maxBy { it.updated }.id
+        writeIndex(c, cardId, idx)
+    }
+
+    /** Count of things the user said in a conversation (for the list). */
+    fun userCount(c: Context, cardId: String, sid: String) = load(c, cardId, sid).count { it.role == "user" }
+
+    /** Removes every conversation of a deleted card. */
+    fun deleteCard(c: Context, cardId: String) {
+        val p = prefs(c)
+        val e = p.edit()
+        p.all.keys.filter { it == cardId || it == idxKey(cardId) || it.startsWith("msg:$cardId:") }.forEach { e.remove(it) }
+        e.apply()
+    }
 }
 
 /** Talks to an Anthropic Messages or OpenAI Chat Completions compatible endpoint. */
@@ -178,6 +305,27 @@ object ChatClient {
         return (card.persona.trim() + "\n\n" + PET_NOTE)
             .replace("{{char}}", card.name)
             .replace("{{user}}", user)
+    }
+
+    /**
+     * Adds [userText] to the card's current conversation, asks the model and stores the reply in that
+     * same conversation, even if another one is opened meanwhile. Returns that conversation's id.
+     */
+    fun ask(c: Context, card: Card, userText: String, image: String? = null, done: (Result<String>) -> Unit): String {
+        val app = c.applicationContext
+        val sid = ChatStore.currentId(app, card.id)
+        val history = ChatStore.load(app, card.id, sid)
+        history.add(Msg("user", userText))
+        ChatStore.save(app, card.id, history, sid)
+        send(app, card, history, image) { result ->
+            result.onSuccess { reply ->
+                val h = ChatStore.load(app, card.id, sid)
+                h.add(Msg("assistant", reply))
+                ChatStore.save(app, card.id, h, sid)
+            }
+            done(result)
+        }
+        return sid
     }
 
     /** Sends [history] (ending with the user's message) and calls [done] on the main thread. */

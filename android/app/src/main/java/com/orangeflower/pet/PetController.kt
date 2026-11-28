@@ -698,17 +698,9 @@ class PetController(private val context: Context, private val wm: WindowManager)
             return
         }
         val card = CardStore.active(context)
-        val history = ChatStore.load(context, card.id)
-        history.add(Msg("user", text))
-        ChatStore.save(context, card.id, history)
         thinking()
-        ChatClient.send(context, card, history) { result ->
-            result.onSuccess { reply ->
-                val h = ChatStore.load(context, card.id)
-                h.add(Msg("assistant", reply))
-                ChatStore.save(context, card.id, h)
-                speak(reply)
-            }.onFailure { e ->
+        ChatClient.ask(context, card, text) { result ->
+            result.onSuccess { reply -> speak(reply) }.onFailure { e ->
                 speak("……好像没连上。" + (e.message?.let { "（${it.take(60)}）" } ?: ""))
             }
         }
@@ -871,17 +863,9 @@ class PetController(private val context: Context, private val wm: WindowManager)
         }
         effect("question", 1.4f)
         val card = CardStore.active(context)
-        val history = ChatStore.load(context, card.id)
-        history.add(Msg("user", "【识图】（给你看了一眼现在的屏幕）"))
-        ChatStore.save(context, card.id, history)
         thinking()
-        ChatClient.send(context, card, history, image) { result ->
-            result.onSuccess { reply ->
-                val h = ChatStore.load(context, card.id)
-                h.add(Msg("assistant", reply))
-                ChatStore.save(context, card.id, h)
-                speak(reply)
-            }.onFailure { e ->
+        ChatClient.ask(context, card, "【识图】（给你看了一眼现在的屏幕）", image) { result ->
+            result.onSuccess { reply -> speak(reply) }.onFailure { e ->
                 val m = e.message ?: ""
                 speak(if (m.contains("image", true) || m.contains("vision", true) || m.contains("400"))
                     "这个模型好像看不了图片，换一个支持识图的模型试试？" else "……好像没连上。（${m.take(60)}）")
@@ -932,17 +916,9 @@ class PetController(private val context: Context, private val wm: WindowManager)
         reactBusy = true
         lastReactAt = clock
         val card = CardStore.active(context)
-        val history = ChatStore.load(context, card.id)
-        history.add(Msg("user", ACTION_PREFIX + event))
-        ChatStore.save(context, card.id, history)
-        ChatClient.send(context, card, history) { result ->
+        ChatClient.ask(context, card, ACTION_PREFIX + event) { result ->
             reactBusy = false
-            result.onSuccess { reply ->
-                val h = ChatStore.load(context, card.id)
-                h.add(Msg("assistant", reply))
-                ChatStore.save(context, card.id, h)
-                speak(reply)
-            }.onFailure { say(Lines.pick(fallback), 2.6f) }
+            result.onSuccess { reply -> speak(reply) }.onFailure { say(Lines.pick(fallback), 2.6f) }
             queuedReaction?.let { (e, f) ->
                 queuedReaction = null
                 handler.postDelayed({ react(e, f) }, 2600)

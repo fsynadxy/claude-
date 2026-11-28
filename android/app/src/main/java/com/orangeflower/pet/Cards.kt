@@ -73,7 +73,7 @@ object CardStore {
     fun delete(c: Context, id: String) {
         writeList(c, custom(c).filter { it.id != id })
         if (prefs(c).getString("active", BUILTIN_ID) == id) setActive(c, BUILTIN_ID)
-        ChatStore.clear(c, id)
+        ChatStore.deleteCard(c, id)
     }
 
     private fun writeList(c: Context, list: List<Card>) {
