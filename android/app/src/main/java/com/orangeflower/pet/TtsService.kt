@@ -32,13 +32,13 @@ class TtsService : Service() {
 
     private fun handle(msg: Message) {
         when (msg.what) {
-            MSG_PREPARE -> Voice.prepare(this)
+            MSG_PREPARE -> Voice.prepare(this, choiceOf(msg.data))
             MSG_STOP -> Voice.stop()
             MSG_SPEAK -> {
                 val parts = msg.data.getStringArrayList("parts") ?: arrayListOf()
                 val gen = msg.arg1
                 val reply = msg.replyTo
-                Voice.speak(this, parts, onSentence = { i, seconds ->
+                Voice.speak(this, parts, choiceOf(msg.data), onSentence = { i, seconds ->
                     send(reply, Message.obtain(null, MSG_SENTENCE, gen, i).apply { data = Bundle().apply { putFloat("s", seconds) } })
                 }, onDone = { ok ->
                     send(reply, Message.obtain(null, MSG_DONE, gen, if (ok) 1 else 0).apply {
@@ -48,6 +48,10 @@ class TtsService : Service() {
             }
         }
     }
+
+    private fun choiceOf(b: Bundle?) = VoiceChoice(
+        b?.getString("pack") ?: VoicePacks.BUILTIN, b?.getInt("sid") ?: 0, b?.getFloat("speed", 1.05f) ?: 1.05f,
+    )
 
     private fun send(to: Messenger?, m: Message) {
         try {
@@ -110,9 +114,13 @@ object VoiceClient {
         }
     }
 
+    private fun choiceBundle(c: Context) = VoiceSettings.choice(c).let { ch ->
+        Bundle().apply { putString("pack", ch.pack); putInt("sid", ch.sid); putFloat("speed", ch.speed) }
+    }
+
     fun prepare(c: Context) {
         ensureBound(c)
-        send(Message.obtain(null, MSG_PREPARE))
+        send(Message.obtain(null, MSG_PREPARE).apply { data = choiceBundle(c) })
     }
 
     fun speak(c: Context, parts: List<String>, onSentence: (Int, Float) -> Unit, onDone: (Boolean) -> Unit) {
@@ -122,7 +130,7 @@ object VoiceClient {
         this.onSentence = onSentence
         this.onDone = onDone
         send(Message.obtain(null, MSG_SPEAK, gen, 0).apply {
-            data = Bundle().apply { putStringArrayList("parts", ArrayList(parts)) }
+            data = choiceBundle(c).apply { putStringArrayList("parts", ArrayList(parts)) }
             replyTo = this@VoiceClient.replyTo
         })
     }

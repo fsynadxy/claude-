@@ -7,7 +7,7 @@ plugins {
 }
 
 // Shown version; CI reads it for the APK name and the release tag.
-val appVersion = "1.3.0"
+val appVersion = "1.4.0"
 // CI run number becomes the version code, so each new APK installs over the previous one.
 val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
 
@@ -114,6 +114,8 @@ android {
 
 dependencies {
     implementation(files(sherpaAar))
+    // unpacks downloaded voice packs (.tar.bz2)
+    implementation("org.apache.commons:commons-compress:1.27.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
 }

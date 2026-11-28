@@ -39,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var sizeLabel: TextView
     private lateinit var cardLabel: TextView
+    private lateinit var voiceLabel: TextView
     private lateinit var diagText: TextView
     private lateinit var updateBox: LinearLayout
     private lateinit var updateTitle: TextView
@@ -308,12 +309,18 @@ class MainActivity : Activity() {
             }
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
         root.addView(TextView(this).apply {
-            text = "语音在手机上离线合成（开源 sherpa-onnx + piper 中文女声 huayan），不联网、不收费。第一次朗读前会把约 65 MB 的语音模型解压到应用目录，需要几秒钟。"
+            text = "语音在手机上离线合成（开源 sherpa-onnx），不联网、不收费。默认是内置的华燕；在“语音包”里可以下载别的声音，还能调语速、挑声线。"
             textSize = 12f
             setTextColor(muted)
         }, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(2) })
+        voiceLabel = TextView(this).apply { textSize = 14f; setTextColor(ink) }
+        root.addView(voiceLabel, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
         val voiceStatus = TextView(this).apply { textSize = 13f; setTextColor(muted) }
-        root.addView(outlineButton("试听语音") {
+        val voiceButtons = LinearLayout(this)
+        voiceButtons.addView(outlineButton("语音包") {
+            startActivity(Intent(this, VoicePacksActivity::class.java))
+        }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { rightMargin = dp(8) })
+        voiceButtons.addView(outlineButton("试听语音") {
             voiceStatus.text = "正在准备语音……（第一次需要几秒）"
             val started = System.currentTimeMillis()
             VoiceClient.speak(this, listOf("你好，我是 Clau娘。", "这样说话，听得清楚吗？"), onSentence = { i, sec ->
@@ -321,7 +328,8 @@ class MainActivity : Activity() {
             }, onDone = { ok ->
                 voiceStatus.text = if (ok) "语音正常" else "语音没能播放：${VoiceClient.lastError ?: "未知原因"}\n诊断信息里可能有更多细节。"
             })
-        }, LinearLayout.LayoutParams(MATCH_PARENT, dp(42)).apply { topMargin = dp(8) })
+        }, LinearLayout.LayoutParams(0, dp(42), 1f))
+        root.addView(voiceButtons, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(8) })
         root.addView(voiceStatus, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
 
         // ---- character cards
@@ -479,6 +487,7 @@ class MainActivity : Activity() {
         val report = Diagnostics.report(this)
         diagText.text = if (report.lines().size > 1) report.takeLast(3000) else report + "\n暂无异常记录"
         cardLabel.text = "当前角色：${CardStore.active(this).name}"
+        voiceLabel.text = "当前声音：${VoicePacks.find(VoiceSettings.packId(this))?.name ?: "华燕"}"
         val canOverlay = Settings.canDrawOverlays(this)
         toggle.text = if (PetService.running) "让她回去休息" else "请她出来"
         status.text = when {
