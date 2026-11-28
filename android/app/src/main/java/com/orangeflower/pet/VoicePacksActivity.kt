@@ -89,7 +89,7 @@ class VoicePacksActivity : Activity() {
         speakerRow = LinearLayout(this)
         speakerBox.addView(HorizontalScrollView(this).apply { isHorizontalScrollBarEnabled = false; addView(speakerRow) },
             LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(4) })
-        speakerBox.addView(small("换了声线后点下面的“试读”听听。第一次用这个声音时要先加载几秒。"))
+        speakerBox.addView(small("从左到右声音由高到低。换了声线后点下面的“试读”听听；第一次用这个声音要先加载几秒。"))
         root.addView(speakerBox, LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT).apply { topMargin = dp(12) })
 
         tryStatus = small("")
